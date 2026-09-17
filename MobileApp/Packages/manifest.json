@@ -1,5 +1,7 @@
 {
   "dependencies": {
+    "com.cysharp.r3": "1.3.1",
+    "com.cysharp.unitask": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask",
     "com.unity.ai.navigation": "2.0.9",
     "com.unity.collab-proxy": "2.11.3",
     "com.unity.ide.rider": "3.0.39",
@@ -15,6 +17,9 @@
     "com.unity.xr.arcore": "6.3.5",
     "com.unity.xr.arfoundation": "6.3.5",
     "com.unity.xr.arkit": "6.3.5",
+    "org.nuget.observablecollections": "3.3.4",
+    "org.nuget.observablecollections.r3": "3.3.4",
+    "org.nuget.r3": "1.3.1",
     "com.unity.modules.accessibility": "1.0.0",
     "com.unity.modules.adaptiveperformance": "1.0.0",
     "com.unity.modules.ai": "1.0.0",
@@ -49,5 +54,21 @@
     "com.unity.modules.vr": "1.0.0",
     "com.unity.modules.wind": "1.0.0",
     "com.unity.modules.xr": "1.0.0"
-  }
+  },
+  "scopedRegistries": [
+    {
+      "name": "Unity NuGet",
+      "url": "https://unitynuget-registry.openupm.com",
+      "scopes": [
+        "org.nuget"
+      ]
+    },
+    {
+      "name": "OpenUPM",
+      "url": "https://package.openupm.com",
+      "scopes": [
+        "com.cysharp"
+      ]
+    }
+  ]
 }
