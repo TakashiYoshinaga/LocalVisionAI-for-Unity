@@ -15,32 +15,31 @@ public class ImageCaptureManager : MonoBehaviour
     [SerializeField] private ARCameraManager _cameraManager;
 
     private VisionAiDataSource _dataSource;
-    private UnityEngine.UI.Button _captureButton;
+    private Action<bool> _onCaptureAvailabilityChanged;
     private bool _captureInProgress;
     private bool _inferenceInProgress;
     private bool _aiReady;
     private IDisposable _progressSubscription;
 
+    /// <summary>
+    /// Reports whether capturing is currently allowed through
+    /// <paramref name="onCaptureAvailabilityChanged"/>. The caller owns the UI
+    /// and decides how to reflect that, so this class never touches a UI type.
+    /// </summary>
     public void Initialize(
         VisionAiDataSource visionAiDataSource,
-        UnityEngine.UI.Button captureButton)
+        Action<bool> onCaptureAvailabilityChanged)
     {
         _dataSource = visionAiDataSource;
-        _captureButton = captureButton;
+        _onCaptureAvailabilityChanged = onCaptureAvailabilityChanged;
 
-        if (_captureButton == null)
-        {
-            PublishError("Analyze Camera button is not configured.");
-            return;
-        }
-
-        _captureButton.onClick.AddListener(CaptureCameraImage);
-        _captureButton.interactable = false;
+        _onCaptureAvailabilityChanged?.Invoke(false);
         _progressSubscription = _dataSource.ProgressReports
             .Subscribe(HandleProgressReport);
     }
 
-    private void CaptureCameraImage()
+    /// <summary>Captures one frame. Ignored unless the AI is idle and ready.</summary>
+    public void CaptureCameraImage()
     {
         if (!_aiReady || _inferenceInProgress)
         {
@@ -74,7 +73,7 @@ public class ImageCaptureManager : MonoBehaviour
         }
 
         _captureInProgress = true;
-        _captureButton.interactable = false;
+        _onCaptureAvailabilityChanged?.Invoke(false);
         _dataSource?.PublishProgress(new VisionAiProgressReport(
             VisionAiPhase.Capturing,
             "Capturing camera image..."));
@@ -146,7 +145,7 @@ public class ImageCaptureManager : MonoBehaviour
             }
 
             _captureInProgress = false;
-            UpdateCaptureButton();
+            NotifyCaptureAvailability();
         }
     }
 
@@ -171,17 +170,17 @@ public class ImageCaptureManager : MonoBehaviour
                 break;
         }
 
-        UpdateCaptureButton();
+        NotifyCaptureAvailability();
     }
 
-    private void UpdateCaptureButton()
+    private void NotifyCaptureAvailability()
     {
-        if (_captureButton == null || _captureInProgress)
+        if (_captureInProgress)
         {
             return;
         }
 
-        _captureButton.interactable = _aiReady && !_inferenceInProgress;
+        _onCaptureAvailabilityChanged?.Invoke(_aiReady && !_inferenceInProgress);
     }
 
     private static Vector2Int GetScaledDimensions(int width, int height)
@@ -268,10 +267,5 @@ public class ImageCaptureManager : MonoBehaviour
     private void OnDestroy()
     {
         _progressSubscription?.Dispose();
-
-        if (_captureButton != null)
-        {
-            _captureButton.onClick.RemoveListener(CaptureCameraImage);
-        }
     }
 }
