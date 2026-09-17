@@ -105,6 +105,10 @@ InitTestScene*.unity*
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
 
+# Unity Test Framework performance run artifacts, regenerated on every build
+/MobileApp/Assets/Resources/PerformanceTestRunInfo.json*
+/MobileApp/Assets/Resources/PerformanceTestRunSettings.json*
+
 # Local development and generated artifacts
 .ai-private/
 .vscode/
@@ -115,6 +119,8 @@ InitTestScene*.unity*
 *.litertlm.meta
 *.litertlm.sha256
 *.litertlm.sha256.meta
+*.litertlm.part[0-9][0-9][0-9]
+*.litertlm.part[0-9][0-9][0-9].meta
 *.partial
 *.partial.meta
 

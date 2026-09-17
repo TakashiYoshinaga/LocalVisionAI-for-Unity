@@ -9,6 +9,7 @@ import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.IOException
 import java.security.MessageDigest
+import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -130,46 +131,51 @@ object BundledModelBridge {
         var lastReportedProgress = -1f
 
         try {
-            activity.assets.open(assetPath, AssetManager.ACCESS_STREAMING).use { input ->
-                FileOutputStream(partial).use { output ->
-                    val buffer = ByteArray(BUFFER_SIZE)
+            FileOutputStream(partial).use { output ->
+                val buffer = ByteArray(BUFFER_SIZE)
 
-                    while (true) {
-                        val read = input.read(buffer)
-                        if (read < 0) {
-                            break
+                for (partIndex in 0 until metadata.partCount) {
+                    val partPath = partAssetPath(assetPath, partIndex)
+
+                    activity.assets.open(partPath, AssetManager.ACCESS_STREAMING)
+                        .use { input ->
+                            while (true) {
+                                val read = input.read(buffer)
+                                if (read < 0) {
+                                    break
+                                }
+
+                                output.write(buffer, 0, read)
+                                digest.update(buffer, 0, read)
+                                copiedBytes += read
+
+                                val progress = if (metadata.size > 0L) {
+                                    (copiedBytes.toDouble() / metadata.size.toDouble())
+                                        .coerceIn(0.0, 1.0)
+                                        .toFloat()
+                                } else {
+                                    0f
+                                }
+
+                                if (progress - lastReportedProgress >= PROGRESS_STEP) {
+                                    lastReportedProgress = progress
+                                    send(
+                                        callbackGameObject,
+                                        "ExtractingModel",
+                                        "Extracting bundled AI model...",
+                                        progress,
+                                        ready = false,
+                                        retryable = true
+                                    )
+                                }
+                            }
                         }
-
-                        output.write(buffer, 0, read)
-                        digest.update(buffer, 0, read)
-                        copiedBytes += read
-
-                        val progress = if (metadata.size > 0L) {
-                            (copiedBytes.toDouble() / metadata.size.toDouble())
-                                .coerceIn(0.0, 1.0)
-                                .toFloat()
-                        } else {
-                            0f
-                        }
-
-                        if (progress - lastReportedProgress >= PROGRESS_STEP) {
-                            lastReportedProgress = progress
-                            send(
-                                callbackGameObject,
-                                "ExtractingModel",
-                                "Extracting bundled AI model...",
-                                progress,
-                                ready = false,
-                                retryable = true
-                            )
-                        }
-                    }
-
-                    output.fd.sync()
                 }
+
+                output.fd.sync()
             }
 
-            val copiedHash = digest.digest().toHexString()
+            val copiedHash = digest.digest().toHex()
             if (copiedBytes != metadata.size ||
                 !copiedHash.equals(metadata.sha256, ignoreCase = true)) {
                 throw ModelIntegrityException()
@@ -188,7 +194,7 @@ object BundledModelBridge {
                 modelPath = destination.absolutePath
             )
         } catch (exception: Exception) {
-            deleteIfPresent(partial)
+            deleteQuietly(partial)
             throw exception
         }
     }
@@ -213,11 +219,13 @@ object BundledModelBridge {
 
         val hash = values["sha256"]
         val size = values["size"]?.toLongOrNull()
-        if (hash == null || hash.length != 64 || size == null || size <= 0L) {
+        val partCount = values["parts"]?.toIntOrNull() ?: 1
+        if (hash == null || hash.length != 64 || size == null || size <= 0L ||
+            partCount <= 0) {
             throw ModelIntegrityException()
         }
 
-        return ModelMetadata(hash.lowercase(), size)
+        return ModelMetadata(hash.lowercase(), size, partCount)
     }
 
     private fun isVerified(
@@ -283,6 +291,13 @@ object BundledModelBridge {
         replaceFile(temporary, verification)
     }
 
+    private fun deleteQuietly(file: File) {
+        try {
+            deleteIfPresent(file)
+        } catch (_: IOException) {
+        }
+    }
+
     private fun deleteIfPresent(file: File) {
         if (file.exists() && !file.delete()) {
             throw IOException("Could not replace stale model data.")
@@ -330,7 +345,10 @@ object BundledModelBridge {
         )
     }
 
-    private fun ByteArray.toHexString(): String =
+    private fun partAssetPath(assetPath: String, partIndex: Int): String =
+        String.format(Locale.US, "%s.part%03d", assetPath, partIndex)
+
+    private fun ByteArray.toHex(): String =
         joinToString(separator = "") { byte -> "%02x".format(byte) }
 
     private fun safeMessage(exception: Exception): String =
@@ -338,7 +356,8 @@ object BundledModelBridge {
 
     private data class ModelMetadata(
         val sha256: String,
-        val size: Long
+        val size: Long,
+        val partCount: Int
     )
 
     private class InsufficientStorageException : IOException()
