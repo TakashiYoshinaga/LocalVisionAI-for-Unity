@@ -2,6 +2,10 @@ package com.takashiyoshinaga.localvisionai
 
 import android.content.res.AssetManager
 import android.os.StatFs
+import android.util.Log
+import com.google.ai.edge.litertlm.Backend
+import com.google.ai.edge.litertlm.Engine
+import com.google.ai.edge.litertlm.EngineConfig
 import com.unity3d.player.UnityPlayer
 import org.json.JSONObject
 import java.io.File
@@ -14,6 +18,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 object BundledModelBridge {
+    private const val LOG_TAG = "LocalVisionAI"
     private const val MODELS_DIRECTORY = "Models"
     private const val BUFFER_SIZE = 1024 * 1024
     private const val STORAGE_MARGIN_BYTES = 16L * 1024L * 1024L
@@ -21,6 +26,12 @@ object BundledModelBridge {
 
     private val executor = Executors.newSingleThreadExecutor()
     private val isPreparing = AtomicBoolean(false)
+    private val isInitializing = AtomicBoolean(false)
+    private val shutdownRequested = AtomicBoolean(false)
+    private val engineLock = Any()
+
+    @Volatile
+    private var engine: Engine? = null
 
     @JvmStatic
     fun prepareBundledModel(
@@ -80,6 +91,151 @@ object BundledModelBridge {
             } finally {
                 isPreparing.set(false)
             }
+        }
+    }
+
+    @JvmStatic
+    fun initialize(
+        callbackGameObject: String,
+        modelPath: String
+    ) {
+        if (!isInitializing.compareAndSet(false, true)) {
+            sendEngine(
+                callbackGameObject,
+                "Initializing",
+                "AI engine initialization is already running.",
+                ready = false
+            )
+            return
+        }
+
+        shutdownRequested.set(false)
+        executor.execute {
+            try {
+                initializeEngine(callbackGameObject, modelPath)
+            } catch (throwable: Throwable) {
+                Log.e(LOG_TAG, "LiteRT-LM initialization failed.", throwable)
+                sendEngine(
+                    callbackGameObject,
+                    "Error",
+                    "Could not initialize the AI engine: ${safeMessage(throwable)}",
+                    ready = false
+                )
+            } finally {
+                isInitializing.set(false)
+            }
+        }
+    }
+
+    @JvmStatic
+    fun shutdown() {
+        shutdownRequested.set(true)
+        executor.execute {
+            val engineToClose = synchronized(engineLock) {
+                val current = engine
+                engine = null
+                current
+            }
+            closeQuietly(engineToClose)
+        }
+    }
+
+    private fun initializeEngine(
+        callbackGameObject: String,
+        modelPath: String
+    ) {
+        val model = File(modelPath)
+        if (!model.isFile || model.length() <= 0L) {
+            throw FileNotFoundException("Prepared AI model was not found.")
+        }
+
+        synchronized(engineLock) {
+            engine?.let { existing ->
+                if (existing.isInitialized()) {
+                    sendEngine(
+                        callbackGameObject,
+                        "Ready",
+                        "AI Ready",
+                        ready = true
+                    )
+                    return
+                }
+            }
+        }
+
+        sendEngine(
+            callbackGameObject,
+            "Initializing",
+            "Initializing AI engine...",
+            ready = false
+        )
+
+        var candidate: Engine? = null
+        var selectedBackend = "GPU"
+
+        try {
+            candidate = createEngine(model.absolutePath, Backend.GPU())
+            candidate.initialize()
+        } catch (gpuFailure: Throwable) {
+            closeQuietly(candidate)
+            candidate = null
+            selectedBackend = "CPU fallback"
+            Log.w(
+                LOG_TAG,
+                "GPU model initialization failed; retrying the main model on CPU.",
+                gpuFailure
+            )
+            sendEngine(
+                callbackGameObject,
+                "Initializing",
+                "GPU initialization failed. Trying CPU fallback...",
+                ready = false
+            )
+
+            candidate = createEngine(model.absolutePath, Backend.CPU())
+            candidate.initialize()
+        }
+
+        if (shutdownRequested.get()) {
+            closeQuietly(candidate)
+            return
+        }
+
+        synchronized(engineLock) {
+            closeQuietly(engine)
+            engine = candidate
+        }
+
+        Log.i(LOG_TAG, "LiteRT-LM initialized with $selectedBackend backend.")
+        sendEngine(
+            callbackGameObject,
+            "Ready",
+            "AI Ready",
+            ready = true
+        )
+    }
+
+    private fun createEngine(modelPath: String, mainBackend: Backend): Engine {
+        val activity = UnityPlayer.currentActivity
+            ?: throw IllegalStateException("Unity activity is unavailable.")
+        val config = EngineConfig(
+            modelPath = modelPath,
+            backend = mainBackend,
+            visionBackend = Backend.GPU(),
+            cacheDir = activity.cacheDir.absolutePath
+        )
+        return Engine(config)
+    }
+
+    private fun closeQuietly(engineToClose: Engine?) {
+        if (engineToClose == null) {
+            return
+        }
+
+        try {
+            engineToClose.close()
+        } catch (throwable: Throwable) {
+            Log.w(LOG_TAG, "Could not close the LiteRT-LM engine cleanly.", throwable)
         }
     }
 
@@ -345,14 +501,37 @@ object BundledModelBridge {
         )
     }
 
+    private fun sendEngine(
+        callbackGameObject: String,
+        phase: String,
+        message: String,
+        ready: Boolean
+    ) {
+        val payload = JSONObject()
+            .put("phase", phase)
+            .put("message", message)
+            .put("hasProgress", false)
+            .put("progress01", 0f)
+            .put("ready", ready)
+            .put("retryable", phase == "Error")
+            .put("modelPath", "")
+            .toString()
+
+        UnityPlayer.UnitySendMessage(
+            callbackGameObject,
+            "OnEngineProgress",
+            payload
+        )
+    }
+
     private fun partAssetPath(assetPath: String, partIndex: Int): String =
         String.format(Locale.US, "%s.part%03d", assetPath, partIndex)
 
     private fun ByteArray.toHex(): String =
         joinToString(separator = "") { byte -> "%02x".format(byte) }
 
-    private fun safeMessage(exception: Exception): String =
-        exception.message?.take(160) ?: exception.javaClass.simpleName
+    private fun safeMessage(throwable: Throwable): String =
+        throwable.message?.take(160) ?: throwable.javaClass.simpleName
 
     private data class ModelMetadata(
         val sha256: String,
