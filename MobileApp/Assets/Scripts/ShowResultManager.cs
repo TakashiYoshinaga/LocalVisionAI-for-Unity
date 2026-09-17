@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using R3;
 using UnityEngine;
 
@@ -28,7 +29,48 @@ public class ShowResultManager : MonoBehaviour
         _progressSubscription = visionAiDataSource.ProgressReports
             .Subscribe(report => onDisplayTextChanged(FormatProgress(report)));
         _resultSubscription = visionAiDataSource.ResultText
-            .Subscribe(result => onDisplayTextChanged(result));
+            .Subscribe(result => onDisplayTextChanged(ToDisplayText(result)));
+    }
+
+    /// <summary>
+    /// The model answers in Markdown, which TextMesh Pro shows verbatim. Emphasis
+    /// markers are dropped and list markers become bullets. Nothing is converted
+    /// to rich text tags, so model output can never be read as TMP markup.
+    /// </summary>
+    private static string ToDisplayText(string result)
+    {
+        if (string.IsNullOrEmpty(result))
+        {
+            return string.Empty;
+        }
+
+        var builder = new StringBuilder(result.Length);
+
+        foreach (string line in result.Split('\n'))
+        {
+            string trimmed = line.TrimStart();
+            string indent = line.Substring(0, line.Length - trimmed.Length);
+
+            if (trimmed.StartsWith("* ") || trimmed.StartsWith("- "))
+            {
+                builder.Append(indent).Append("\u2022 ").Append(trimmed, 2, trimmed.Length - 2);
+            }
+            else if (trimmed.StartsWith("#"))
+            {
+                builder.Append(indent).Append(trimmed.TrimStart('#').TrimStart());
+            }
+            else
+            {
+                builder.Append(line);
+            }
+
+            builder.Append('\n');
+        }
+
+        return builder
+            .Replace("**", string.Empty)
+            .ToString()
+            .TrimEnd('\n');
     }
 
     private static string FormatProgress(VisionAiProgressReport report)

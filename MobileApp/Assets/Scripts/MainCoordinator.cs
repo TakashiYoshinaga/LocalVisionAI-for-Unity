@@ -7,6 +7,9 @@ using UnityEngine;
 /// </summary>
 public class MainCoordinator : MonoBehaviour
 {
+    private const string CaptureLabel = "Analyze Camera";
+    private const string RetryLabel = "Retry Setup";
+
     [SerializeField] private ImageCaptureManager _imageCaptureManager;
     [SerializeField] private VisionAiManager _visionAiManager;
     [SerializeField] private ShowResultManager _showResultManager;
@@ -14,6 +17,10 @@ public class MainCoordinator : MonoBehaviour
     [SerializeField] private UnityEngine.UI.Button _captureButton;
 
     private readonly VisionAiDataSource _visionAiDataSource = new();
+
+    private TMPro.TMP_Text _captureButtonLabel;
+    private bool _captureAvailable;
+    private bool _retryAvailable;
 
     private void Start()
     {
@@ -28,6 +35,7 @@ public class MainCoordinator : MonoBehaviour
         }
         else
         {
+            _captureButtonLabel = _captureButton.GetComponentInChildren<TMPro.TMP_Text>();
             _captureButton.onClick.AddListener(OnCaptureButtonClicked);
             _captureButton.interactable = false;
         }
@@ -36,19 +44,48 @@ public class MainCoordinator : MonoBehaviour
         // other managers report while they start up.
         _showResultManager.Initialize(_visionAiDataSource, SetResultText);
         _imageCaptureManager.Initialize(_visionAiDataSource, SetCaptureAvailable);
-        _visionAiManager.Initialize(_visionAiDataSource);
+        _visionAiManager.Initialize(_visionAiDataSource, SetRetryAvailable);
     }
 
+    /// <summary>
+    /// The single button does double duty: it retries a failed setup when one
+    /// can be retried, and captures otherwise.
+    /// </summary>
     private void OnCaptureButtonClicked()
     {
+        if (_retryAvailable)
+        {
+            _visionAiManager.RetryModelSetup();
+            return;
+        }
+
         _imageCaptureManager.CaptureCameraImage();
     }
 
     private void SetCaptureAvailable(bool available)
     {
-        if (_captureButton != null)
+        _captureAvailable = available;
+        ApplyButtonState();
+    }
+
+    private void SetRetryAvailable(bool available)
+    {
+        _retryAvailable = available;
+        ApplyButtonState();
+    }
+
+    private void ApplyButtonState()
+    {
+        if (_captureButton == null)
         {
-            _captureButton.interactable = available;
+            return;
+        }
+
+        _captureButton.interactable = _retryAvailable || _captureAvailable;
+
+        if (_captureButtonLabel != null)
+        {
+            _captureButtonLabel.text = _retryAvailable ? RetryLabel : CaptureLabel;
         }
     }
 

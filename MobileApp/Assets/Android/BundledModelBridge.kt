@@ -5,12 +5,14 @@ import android.os.StatFs
 import android.os.SystemClock
 import android.util.Log
 import com.google.ai.edge.litertlm.Backend
+import com.google.ai.edge.litertlm.Channel
 import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.Message
+import com.google.ai.edge.litertlm.ThinkingConfig
 import com.unity3d.player.UnityPlayer
 import org.json.JSONObject
 import java.io.File
@@ -28,6 +30,15 @@ object BundledModelBridge {
     private const val BUFFER_SIZE = 1024 * 1024
     private const val STORAGE_MARGIN_BYTES = 16L * 1024L * 1024L
     private const val PROGRESS_STEP = 0.01f
+
+    /**
+     * Gemma 4 wraps its thinking text in these markers. Declaring them as a
+     * channel keeps that text out of the answer's Content.Text and puts it in
+     * Message.channels instead, which this bridge never reads or logs.
+     */
+    private const val THINKING_OPEN = "<|channel>"
+    private const val THINKING_CLOSE = "<channel|>"
+    private val thinkingChannel = Channel("thinking", THINKING_OPEN, THINKING_CLOSE)
 
     private val executor = Executors.newSingleThreadExecutor()
     private val isPreparing = AtomicBoolean(false)
@@ -138,7 +149,10 @@ object BundledModelBridge {
         callbackGameObject: String,
         requestId: Int,
         imageData: ByteArray,
-        prompt: String
+        prompt: String,
+        enableThinking: Boolean,
+        thinkingTokenBudget: Int,
+        answerTokenBudget: Int
     ) {
         if (!isAnalyzing.compareAndSet(false, true)) {
             sendAnalysis(
@@ -152,7 +166,15 @@ object BundledModelBridge {
 
         executor.execute {
             try {
-                runAnalysis(callbackGameObject, requestId, imageData, prompt)
+                runAnalysis(
+                    callbackGameObject,
+                    requestId,
+                    imageData,
+                    prompt,
+                    enableThinking,
+                    thinkingTokenBudget,
+                    answerTokenBudget
+                )
             } catch (throwable: Throwable) {
                 Log.e(LOG_TAG, "Image analysis failed.", throwable)
                 sendAnalysis(
@@ -259,7 +281,10 @@ object BundledModelBridge {
         callbackGameObject: String,
         requestId: Int,
         imageData: ByteArray,
-        prompt: String
+        prompt: String,
+        enableThinking: Boolean,
+        thinkingTokenBudget: Int,
+        answerTokenBudget: Int
     ) {
         if (imageData.isEmpty()) {
             throw IllegalArgumentException("The captured image was empty.")
@@ -285,8 +310,14 @@ object BundledModelBridge {
 
         // One conversation per request. This PoC describes a single image, so
         // keeping history would only grow the context with unused image tokens.
-        val answer = activeEngine.createConversation(ConversationConfig()).use {
-            conversation ->
+        // Thinking is configured here rather than on the engine, so changing it
+        // never reloads the model.
+        val config = ConversationConfig(
+            channels = if (enableThinking) listOf(thinkingChannel) else emptyList(),
+            maxOutputToken = if (answerTokenBudget > 0) answerTokenBudget else null,
+            thinkingConfig = ThinkingConfig(enableThinking, thinkingTokenBudget)
+        )
+        val answer = activeEngine.createConversation(config).use { conversation ->
             extractText(conversation.sendMessage(contents))
         }
 
@@ -294,12 +325,14 @@ object BundledModelBridge {
             return
         }
 
+        // Length only. The answer itself is never logged.
         Log.i(
             LOG_TAG,
             String.format(
                 Locale.US,
-                "Image analysis finished in %.1f s.",
-                (SystemClock.elapsedRealtime() - startedAt) / 1000.0
+                "Image analysis finished in %.1f s (%d characters).",
+                (SystemClock.elapsedRealtime() - startedAt) / 1000.0,
+                answer.length
             )
         )
 
@@ -316,11 +349,34 @@ object BundledModelBridge {
         )
     }
 
+    /**
+     * Reads the answer only. Message.channels, which carries the thinking text
+     * when thinking is on, is deliberately never read.
+     */
     private fun extractText(message: Message): String =
-        message.contents.contents
-            .filterIsInstance<Content.Text>()
-            .joinToString(separator = "") { content -> content.text }
-            .trim()
+        stripThinking(
+            message.contents.contents
+                .filterIsInstance<Content.Text>()
+                .joinToString(separator = "") { content -> content.text }
+        ).trim()
+
+    /**
+     * Drops anything still wrapped in the thinking markers. The channel config
+     * normally removes it first; this is the guarantee that thinking text never
+     * reaches the UI even if it does not.
+     */
+    private fun stripThinking(text: String): String {
+        if (!text.contains(THINKING_OPEN)) {
+            return text
+        }
+
+        return buildString {
+            for (part in text.split(THINKING_CLOSE)) {
+                val open = part.indexOf(THINKING_OPEN)
+                append(if (open >= 0) part.substring(0, open) else part)
+            }
+        }
+    }
 
     private fun createEngine(modelPath: String, mainBackend: Backend): Engine {
         val activity = UnityPlayer.currentActivity
