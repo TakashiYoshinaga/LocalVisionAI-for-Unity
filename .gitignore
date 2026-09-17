@@ -104,3 +104,20 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Local development and generated artifacts
+.ai-private/
+.vscode/
+*_BurstDebugInformation_DoNotShip/
+
+# Local AI models and temporary extraction files
+*.litertlm
+*.litertlm.meta
+*.partial
+*.partial.meta
+
+# Local Android signing material
+*.keystore
+*.jks
+keystore.properties
+local.properties
