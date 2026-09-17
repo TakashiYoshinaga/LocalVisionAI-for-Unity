@@ -9,7 +9,17 @@ public class VisionAiManager : MonoBehaviour
     private const string ModelAssetPath = BundledModelPaths.AndroidAssetPath;
     private const string ModelFileName = BundledModelPaths.FileName;
 
+    [Header("Thinking")]
+    [Tooltip("Applied at the start of each inference. Changing it never reloads the engine.")]
+    [SerializeField] private bool _enableThinking;
+    [SerializeField] private int _thinkingTokenBudget = 256;
+
+    [Header("Answer")]
+    [Tooltip("Maximum answer tokens. 0 or less means no limit.")]
+    [SerializeField] private int _answerTokenBudget;
+
     private VisionAiDataSource _dataSource;
+    private Action<bool> _onRetryAvailabilityChanged;
     private IDisposable _imageRequestSubscription;
     private bool _modelSetupInProgress;
     private bool _engineInitializationInProgress;
@@ -19,14 +29,35 @@ public class VisionAiManager : MonoBehaviour
 
     public string PreparedModelPath { get; private set; }
     public bool IsReady { get; private set; }
+    public bool EnableThinking => _enableThinking;
+    public int ThinkingTokenBudget => _thinkingTokenBudget;
+    public int AnswerTokenBudget => _answerTokenBudget;
 
-    public void Initialize(VisionAiDataSource visionAiDataSource)
+    /// <summary>
+    /// Reports whether the failed setup can be retried through
+    /// <paramref name="onRetryAvailabilityChanged"/>. The caller owns the UI.
+    /// </summary>
+    public void Initialize(
+        VisionAiDataSource visionAiDataSource,
+        Action<bool> onRetryAvailabilityChanged)
     {
         _dataSource = visionAiDataSource;
+        _onRetryAvailabilityChanged = onRetryAvailabilityChanged;
+        _onRetryAvailabilityChanged?.Invoke(false);
         _imageRequestSubscription?.Dispose();
         _imageRequestSubscription = _dataSource.ImageRequests
             .Subscribe(AnalyzeImage);
         RetryModelSetup();
+    }
+
+    /// <summary>
+    /// Changes the thinking settings used by the next inference. The engine is
+    /// never reloaded: the values are read when a request starts.
+    /// </summary>
+    public void SetThinkingConfig(bool enabled, int tokenBudget)
+    {
+        _enableThinking = enabled;
+        _thinkingTokenBudget = Mathf.Max(0, tokenBudget);
     }
 
     public void RetryModelSetup()
@@ -40,6 +71,7 @@ public class VisionAiManager : MonoBehaviour
 
 #if UNITY_ANDROID && !UNITY_EDITOR
         _modelSetupInProgress = true;
+        _onRetryAvailabilityChanged?.Invoke(false);
         _dataSource.PublishProgress(new VisionAiProgressReport(
             VisionAiPhase.ExtractingModel,
             "Preparing bundled AI model...",
@@ -100,11 +132,17 @@ public class VisionAiManager : MonoBehaviour
         {
             PreparedModelPath = callback.modelPath;
             _modelSetupInProgress = false;
+            _onRetryAvailabilityChanged?.Invoke(false);
             StartEngineInitialization();
         }
         else if (phase == VisionAiPhase.Error)
         {
             _modelSetupInProgress = false;
+            _onRetryAvailabilityChanged?.Invoke(callback.retryable);
+        }
+        else
+        {
+            _onRetryAvailabilityChanged?.Invoke(false);
         }
     }
 
@@ -139,11 +177,13 @@ public class VisionAiManager : MonoBehaviour
         {
             IsReady = true;
             _engineInitializationInProgress = false;
+            _onRetryAvailabilityChanged?.Invoke(false);
         }
         else if (phase == VisionAiPhase.Error)
         {
             IsReady = false;
             _engineInitializationInProgress = false;
+            _onRetryAvailabilityChanged?.Invoke(callback.retryable);
         }
     }
 
@@ -180,7 +220,10 @@ public class VisionAiManager : MonoBehaviour
                 gameObject.name,
                 _activeRequestId,
                 request.JpegData,
-                request.Prompt);
+                request.Prompt,
+                _enableThinking,
+                _thinkingTokenBudget,
+                _answerTokenBudget);
         }
         catch (Exception exception)
         {
