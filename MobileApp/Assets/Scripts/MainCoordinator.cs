@@ -5,6 +5,7 @@ public class MainCoordinator : MonoBehaviour
     [SerializeField] private ImageCaptureManager _imageCaptureManager;
     [SerializeField] private VisionAiManager _visionAiManager;
     [SerializeField] private ShowResultManager _showResultManager;
+    [SerializeField] private TMPro.TMP_Text _resultText;
 
     private VisionAiDataSource _visionAiDataSource = new VisionAiDataSource();
 
