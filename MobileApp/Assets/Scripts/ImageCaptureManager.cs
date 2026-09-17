@@ -17,6 +17,7 @@ public class ImageCaptureManager : MonoBehaviour
     private VisionAiDataSource _dataSource;
     private UnityEngine.UI.Button _captureButton;
     private bool _captureInProgress;
+    private bool _inferenceInProgress;
     private bool _aiReady;
     private IDisposable _progressSubscription;
 
@@ -41,7 +42,7 @@ public class ImageCaptureManager : MonoBehaviour
 
     private void CaptureCameraImage()
     {
-        if (!_aiReady)
+        if (!_aiReady || _inferenceInProgress)
         {
             return;
         }
@@ -145,30 +146,42 @@ public class ImageCaptureManager : MonoBehaviour
             }
 
             _captureInProgress = false;
-
-            if (_captureButton != null)
-            {
-                _captureButton.interactable = _aiReady;
-            }
+            UpdateCaptureButton();
         }
     }
 
     private void HandleProgressReport(VisionAiProgressReport report)
     {
-        if (report.Phase == VisionAiPhase.Ready)
+        switch (report.Phase)
         {
-            _aiReady = true;
-        }
-        else if (report.Phase == VisionAiPhase.ExtractingModel ||
-                 report.Phase == VisionAiPhase.Initializing)
-        {
-            _aiReady = false;
+            case VisionAiPhase.Ready:
+                _aiReady = true;
+                _inferenceInProgress = false;
+                break;
+            case VisionAiPhase.ExtractingModel:
+            case VisionAiPhase.Initializing:
+                _aiReady = false;
+                _inferenceInProgress = false;
+                break;
+            case VisionAiPhase.Inferencing:
+                _inferenceInProgress = true;
+                break;
+            case VisionAiPhase.Error:
+                _inferenceInProgress = false;
+                break;
         }
 
-        if (_captureButton != null && !_captureInProgress)
+        UpdateCaptureButton();
+    }
+
+    private void UpdateCaptureButton()
+    {
+        if (_captureButton == null || _captureInProgress)
         {
-            _captureButton.interactable = _aiReady;
+            return;
         }
+
+        _captureButton.interactable = _aiReady && !_inferenceInProgress;
     }
 
     private static Vector2Int GetScaledDimensions(int width, int height)
