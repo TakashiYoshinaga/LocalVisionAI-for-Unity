@@ -10,7 +10,7 @@ public static class BundledModelPaths
     /// The model to bundle. The master file lives at
     /// <c>MobileApp/LocalModels/&lt;FileName&gt;</c>, outside the asset database.
     /// </summary>
-    public const string FileName = "gemma-4-E2B-it-gpu.litertlm";
+    public const string FileName = "gemma-4-E2B-it.litertlm";
 
     /// <summary>Folder under StreamingAssets holding the generated parts.</summary>
     public const string StreamingAssetsFolder = "Models";

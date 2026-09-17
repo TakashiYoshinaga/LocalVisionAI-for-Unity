@@ -1,6 +1,5 @@
 using System;
 using R3;
-using TMPro;
 using UnityEngine;
 
 public class ShowResultManager : MonoBehaviour
@@ -8,17 +7,28 @@ public class ShowResultManager : MonoBehaviour
     private IDisposable _progressSubscription;
     private IDisposable _resultSubscription;
 
+    /// <summary>
+    /// Formats progress and results into the text to show, and hands it to
+    /// <paramref name="onDisplayTextChanged"/>. The caller owns the UI, so this
+    /// class never touches a UI type.
+    /// </summary>
     public void Initialize(
         VisionAiDataSource visionAiDataSource,
-        TMP_Text resultText)
+        Action<string> onDisplayTextChanged)
     {
         _progressSubscription?.Dispose();
         _resultSubscription?.Dispose();
 
+        if (onDisplayTextChanged == null)
+        {
+            Debug.LogError("ShowResultManager was initialized without a text sink.");
+            return;
+        }
+
         _progressSubscription = visionAiDataSource.ProgressReports
-            .Subscribe(report => resultText.text = FormatProgress(report));
+            .Subscribe(report => onDisplayTextChanged(FormatProgress(report)));
         _resultSubscription = visionAiDataSource.ResultText
-            .Subscribe(result => resultText.text = result);
+            .Subscribe(result => onDisplayTextChanged(result));
     }
 
     private static string FormatProgress(VisionAiProgressReport report)

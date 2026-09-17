@@ -1,4 +1,5 @@
 using System;
+using R3;
 using UnityEngine;
 
 public class VisionAiManager : MonoBehaviour
@@ -9,8 +10,12 @@ public class VisionAiManager : MonoBehaviour
     private const string ModelFileName = BundledModelPaths.FileName;
 
     private VisionAiDataSource _dataSource;
+    private IDisposable _imageRequestSubscription;
     private bool _modelSetupInProgress;
     private bool _engineInitializationInProgress;
+    private bool _inferenceInProgress;
+    private int _lastRequestId;
+    private int _activeRequestId;
 
     public string PreparedModelPath { get; private set; }
     public bool IsReady { get; private set; }
@@ -18,6 +23,9 @@ public class VisionAiManager : MonoBehaviour
     public void Initialize(VisionAiDataSource visionAiDataSource)
     {
         _dataSource = visionAiDataSource;
+        _imageRequestSubscription?.Dispose();
+        _imageRequestSubscription = _dataSource.ImageRequests
+            .Subscribe(AnalyzeImage);
         RetryModelSetup();
     }
 
@@ -139,10 +147,110 @@ public class VisionAiManager : MonoBehaviour
         }
     }
 
+    private void AnalyzeImage(VisionAiRequest request)
+    {
+        if (request == null || _dataSource == null)
+        {
+            return;
+        }
+
+        if (!IsReady)
+        {
+            PublishError("The AI engine is not ready yet.");
+            return;
+        }
+
+        if (_inferenceInProgress)
+        {
+            return;
+        }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        _inferenceInProgress = true;
+        _activeRequestId = ++_lastRequestId;
+        _dataSource.PublishProgress(new VisionAiProgressReport(
+            VisionAiPhase.Inferencing,
+            "Analyzing image..."));
+
+        try
+        {
+            using AndroidJavaClass bridge = new(AndroidBridgeClass);
+            bridge.CallStatic(
+                "analyze",
+                gameObject.name,
+                _activeRequestId,
+                request.JpegData,
+                request.Prompt);
+        }
+        catch (Exception exception)
+        {
+            _inferenceInProgress = false;
+            PublishError($"Could not start image analysis: {exception.Message}");
+        }
+#else
+        PublishError("Image analysis requires an Android device.");
+#endif
+    }
+
+    public void OnAnalysisProgress(string json)
+    {
+        AnalysisCallback callback;
+
+        try
+        {
+            callback = JsonUtility.FromJson<AnalysisCallback>(json);
+        }
+        catch (Exception exception)
+        {
+            _inferenceInProgress = false;
+            PublishError($"Invalid analysis response: {exception.Message}");
+            return;
+        }
+
+        if (callback == null ||
+            !Enum.TryParse(callback.phase, out VisionAiPhase phase))
+        {
+            _inferenceInProgress = false;
+            PublishError("Invalid analysis response.");
+            return;
+        }
+
+        if (callback.requestId != _activeRequestId)
+        {
+            return;
+        }
+
+        if (phase == VisionAiPhase.Inferencing)
+        {
+            _dataSource?.PublishProgress(new VisionAiProgressReport(
+                phase,
+                callback.message));
+            return;
+        }
+
+        _inferenceInProgress = false;
+
+        if (phase == VisionAiPhase.Error)
+        {
+            PublishError(callback.message);
+            return;
+        }
+
+        // Report Ready before the answer so the UI re-enables its capture
+        // button first and the answer stays as the last text on screen.
+        _dataSource?.PublishProgress(new VisionAiProgressReport(
+            VisionAiPhase.Ready,
+            callback.message));
+        _dataSource?.PublishResultText(callback.resultText);
+    }
+
     public void Shutdown()
     {
+        _imageRequestSubscription?.Dispose();
+        _imageRequestSubscription = null;
         _modelSetupInProgress = false;
         _engineInitializationInProgress = false;
+        _inferenceInProgress = false;
         IsReady = false;
 
 #if UNITY_ANDROID && !UNITY_EDITOR
@@ -195,6 +303,15 @@ public class VisionAiManager : MonoBehaviour
         _dataSource?.PublishProgress(new VisionAiProgressReport(
             VisionAiPhase.Error,
             message));
+    }
+
+    [Serializable]
+    private sealed class AnalysisCallback
+    {
+        public string phase;
+        public string message;
+        public int requestId;
+        public string resultText;
     }
 
     [Serializable]

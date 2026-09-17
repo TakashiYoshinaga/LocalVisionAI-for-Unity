@@ -2,10 +2,15 @@ package com.takashiyoshinaga.localvisionai
 
 import android.content.res.AssetManager
 import android.os.StatFs
+import android.os.SystemClock
 import android.util.Log
 import com.google.ai.edge.litertlm.Backend
+import com.google.ai.edge.litertlm.Content
+import com.google.ai.edge.litertlm.Contents
+import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.Message
 import com.unity3d.player.UnityPlayer
 import org.json.JSONObject
 import java.io.File
@@ -27,6 +32,7 @@ object BundledModelBridge {
     private val executor = Executors.newSingleThreadExecutor()
     private val isPreparing = AtomicBoolean(false)
     private val isInitializing = AtomicBoolean(false)
+    private val isAnalyzing = AtomicBoolean(false)
     private val shutdownRequested = AtomicBoolean(false)
     private val engineLock = Any()
 
@@ -128,6 +134,40 @@ object BundledModelBridge {
     }
 
     @JvmStatic
+    fun analyze(
+        callbackGameObject: String,
+        requestId: Int,
+        imageData: ByteArray,
+        prompt: String
+    ) {
+        if (!isAnalyzing.compareAndSet(false, true)) {
+            sendAnalysis(
+                callbackGameObject,
+                requestId,
+                "Error",
+                "Image analysis is already running."
+            )
+            return
+        }
+
+        executor.execute {
+            try {
+                runAnalysis(callbackGameObject, requestId, imageData, prompt)
+            } catch (throwable: Throwable) {
+                Log.e(LOG_TAG, "Image analysis failed.", throwable)
+                sendAnalysis(
+                    callbackGameObject,
+                    requestId,
+                    "Error",
+                    "Could not analyze the image: ${safeMessage(throwable)}"
+                )
+            } finally {
+                isAnalyzing.set(false)
+            }
+        }
+    }
+
+    @JvmStatic
     fun shutdown() {
         shutdownRequested.set(true)
         executor.execute {
@@ -214,6 +254,73 @@ object BundledModelBridge {
             ready = true
         )
     }
+
+    private fun runAnalysis(
+        callbackGameObject: String,
+        requestId: Int,
+        imageData: ByteArray,
+        prompt: String
+    ) {
+        if (imageData.isEmpty()) {
+            throw IllegalArgumentException("The captured image was empty.")
+        }
+
+        val activeEngine = synchronized(engineLock) { engine }
+        if (activeEngine == null || !activeEngine.isInitialized()) {
+            throw IllegalStateException("The AI engine is not ready.")
+        }
+
+        sendAnalysis(
+            callbackGameObject,
+            requestId,
+            "Inferencing",
+            "Analyzing image..."
+        )
+
+        val contents = Contents.of(
+            Content.ImageBytes(imageData),
+            Content.Text(prompt)
+        )
+        val startedAt = SystemClock.elapsedRealtime()
+
+        // One conversation per request. This PoC describes a single image, so
+        // keeping history would only grow the context with unused image tokens.
+        val answer = activeEngine.createConversation(ConversationConfig()).use {
+            conversation ->
+            extractText(conversation.sendMessage(contents))
+        }
+
+        if (shutdownRequested.get()) {
+            return
+        }
+
+        Log.i(
+            LOG_TAG,
+            String.format(
+                Locale.US,
+                "Image analysis finished in %.1f s.",
+                (SystemClock.elapsedRealtime() - startedAt) / 1000.0
+            )
+        )
+
+        if (answer.isBlank()) {
+            throw IllegalStateException("The AI model returned an empty answer.")
+        }
+
+        sendAnalysis(
+            callbackGameObject,
+            requestId,
+            "Ready",
+            "AI Ready",
+            answer
+        )
+    }
+
+    private fun extractText(message: Message): String =
+        message.contents.contents
+            .filterIsInstance<Content.Text>()
+            .joinToString(separator = "") { content -> content.text }
+            .trim()
 
     private fun createEngine(modelPath: String, mainBackend: Backend): Engine {
         val activity = UnityPlayer.currentActivity
@@ -520,6 +627,27 @@ object BundledModelBridge {
         UnityPlayer.UnitySendMessage(
             callbackGameObject,
             "OnEngineProgress",
+            payload
+        )
+    }
+
+    private fun sendAnalysis(
+        callbackGameObject: String,
+        requestId: Int,
+        phase: String,
+        message: String,
+        resultText: String = ""
+    ) {
+        val payload = JSONObject()
+            .put("phase", phase)
+            .put("message", message)
+            .put("requestId", requestId)
+            .put("resultText", resultText)
+            .toString()
+
+        UnityPlayer.UnitySendMessage(
+            callbackGameObject,
+            "OnAnalysisProgress",
             payload
         )
     }
