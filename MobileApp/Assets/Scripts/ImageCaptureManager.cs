@@ -3,6 +3,7 @@ using Unity.Collections;
 using UnityEngine;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
+using R3;
 
 public class ImageCaptureManager : MonoBehaviour
 {
@@ -16,6 +17,8 @@ public class ImageCaptureManager : MonoBehaviour
     private VisionAiDataSource _dataSource;
     private UnityEngine.UI.Button _captureButton;
     private bool _captureInProgress;
+    private bool _aiReady;
+    private IDisposable _progressSubscription;
 
     public void Initialize(
         VisionAiDataSource visionAiDataSource,
@@ -31,11 +34,18 @@ public class ImageCaptureManager : MonoBehaviour
         }
 
         _captureButton.onClick.AddListener(CaptureCameraImage);
-        _captureButton.interactable = true;
+        _captureButton.interactable = false;
+        _progressSubscription = _dataSource.ProgressReports
+            .Subscribe(HandleProgressReport);
     }
 
     private void CaptureCameraImage()
     {
+        if (!_aiReady)
+        {
+            return;
+        }
+
 #if UNITY_ANDROID && !UNITY_EDITOR
         if (!UnityEngine.Android.Permission.HasUserAuthorizedPermission(
                 UnityEngine.Android.Permission.Camera))
@@ -138,8 +148,26 @@ public class ImageCaptureManager : MonoBehaviour
 
             if (_captureButton != null)
             {
-                _captureButton.interactable = true;
+                _captureButton.interactable = _aiReady;
             }
+        }
+    }
+
+    private void HandleProgressReport(VisionAiProgressReport report)
+    {
+        if (report.Phase == VisionAiPhase.Ready)
+        {
+            _aiReady = true;
+        }
+        else if (report.Phase == VisionAiPhase.ExtractingModel ||
+                 report.Phase == VisionAiPhase.Initializing)
+        {
+            _aiReady = false;
+        }
+
+        if (_captureButton != null && !_captureInProgress)
+        {
+            _captureButton.interactable = _aiReady;
         }
     }
 
@@ -226,6 +254,8 @@ public class ImageCaptureManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        _progressSubscription?.Dispose();
+
         if (_captureButton != null)
         {
             _captureButton.onClick.RemoveListener(CaptureCameraImage);
