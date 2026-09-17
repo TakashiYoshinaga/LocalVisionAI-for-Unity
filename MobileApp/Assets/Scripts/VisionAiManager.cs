@@ -5,10 +5,8 @@ public class VisionAiManager : MonoBehaviour
 {
     private const string AndroidBridgeClass =
         "com.takashiyoshinaga.localvisionai.BundledModelBridge";
-    private const string ModelAssetPath =
-        "Models/gemma-4-E2B-it.litertlm";
-    private const string ModelFileName =
-        "gemma-4-E2B-it.litertlm";
+    private const string ModelAssetPath = BundledModelPaths.AndroidAssetPath;
+    private const string ModelFileName = BundledModelPaths.FileName;
 
     private VisionAiDataSource _dataSource;
     private bool _modelSetupInProgress;

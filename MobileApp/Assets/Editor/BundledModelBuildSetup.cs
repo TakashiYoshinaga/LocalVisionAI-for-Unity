@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using UnityEditor;
@@ -21,13 +20,13 @@ using UnityEngine;
 [InitializeOnLoad]
 public sealed class BundledModelBuildSetup : IPreprocessBuildWithReport
 {
-    private const string ModelFileName = "gemma-4-E2B-it.litertlm";
+    private const string ModelFileName = BundledModelPaths.FileName;
 
     /// <summary>Master model, outside the Unity asset database.</summary>
     private const string MasterModelPath = "LocalModels/" + ModelFileName;
 
     private const string StreamingModelsDirectory =
-        "Assets/StreamingAssets/Models";
+        "Assets/StreamingAssets/" + BundledModelPaths.StreamingAssetsFolder;
     private const string MetadataAssetPath =
         StreamingModelsDirectory + "/" + ModelFileName + ".sha256";
 
@@ -41,8 +40,6 @@ public sealed class BundledModelBuildSetup : IPreprocessBuildWithReport
 
     private const string KotlinPluginPath =
         "Assets/Android/BundledModelBridge.kt";
-    private const string MainGradleTemplatePath =
-        "Assets/Plugins/Android/mainTemplate.gradle";
 
     public int callbackOrder => -1000;
 
@@ -55,7 +52,6 @@ public sealed class BundledModelBuildSetup : IPreprocessBuildWithReport
     public static void ApplyProjectSettings()
     {
         ConfigureKotlinPlugin();
-        EnableCustomMainGradleTemplate();
     }
 
     public void OnPreprocessBuild(BuildReport report)
@@ -91,42 +87,6 @@ public sealed class BundledModelBuildSetup : IPreprocessBuildWithReport
         importer.SetCompatibleWithEditor(false);
         importer.SetCompatibleWithPlatform(BuildTarget.Android, true);
         importer.SaveAndReimport();
-    }
-
-    private static void EnableCustomMainGradleTemplate()
-    {
-        if (!File.Exists(MainGradleTemplatePath))
-        {
-            throw new InvalidOperationException(
-                $"Gradle template was not found at {MainGradleTemplatePath}.");
-        }
-
-        MethodInfo getSerializedObject = typeof(PlayerSettings).GetMethod(
-            "GetSerializedObject",
-            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-
-        if (getSerializedObject == null ||
-            getSerializedObject.Invoke(null, null) is not SerializedObject settings)
-        {
-            throw new InvalidOperationException(
-                "Could not access serialized Android Player settings.");
-        }
-
-        SerializedProperty useCustomTemplate =
-            settings.FindProperty("useCustomMainGradleTemplate");
-
-        if (useCustomTemplate == null)
-        {
-            throw new InvalidOperationException(
-                "Custom main Gradle template setting was not found.");
-        }
-
-        if (!useCustomTemplate.boolValue)
-        {
-            useCustomTemplate.boolValue = true;
-            settings.ApplyModifiedPropertiesWithoutUndo();
-            AssetDatabase.SaveAssets();
-        }
     }
 
     [MenuItem("Tools/Local Vision AI/Prepare Bundled Model Assets")]
