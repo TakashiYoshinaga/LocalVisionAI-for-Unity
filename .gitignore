@@ -112,6 +112,7 @@ InitTestScene*.unity*
 # Local development and generated artifacts
 .ai-private/
 .vscode/
+.DS_Store
 *_BurstDebugInformation_DoNotShip/
 
 # Local AI models and temporary extraction files

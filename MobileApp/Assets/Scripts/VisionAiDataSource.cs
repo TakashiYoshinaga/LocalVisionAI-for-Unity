@@ -1,20 +1,19 @@
 using System;
 using R3;
-using UnityEngine;
 
 public sealed class VisionAiDataSource : IDisposable
 {
-    private readonly Subject<Texture2D> _imageDataSubject = new();
+    private readonly Subject<VisionAiRequest> _imageRequestSubject = new();
     private readonly Subject<string> _resultTextSubject = new();
     private readonly Subject<VisionAiProgressReport> _progressSubject = new();
 
-    public Observable<Texture2D> ImageData => _imageDataSubject;
+    public Observable<VisionAiRequest> ImageRequests => _imageRequestSubject;
     public Observable<string> ResultText => _resultTextSubject;
     public Observable<VisionAiProgressReport> ProgressReports => _progressSubject;
 
-    public void PublishImageData(Texture2D imageData)
+    public void PublishImageRequest(VisionAiRequest request)
     {
-        _imageDataSubject.OnNext(imageData);
+        _imageRequestSubject.OnNext(request);
     }
 
     public void PublishResultText(string resultText)
@@ -29,7 +28,7 @@ public sealed class VisionAiDataSource : IDisposable
 
     public void Dispose()
     {
-        _imageDataSubject.Dispose();
+        _imageRequestSubject.Dispose();
         _resultTextSubject.Dispose();
         _progressSubject.Dispose();
     }
