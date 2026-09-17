@@ -1,20 +1,36 @@
+using System;
+using R3;
+using TMPro;
 using UnityEngine;
 
 public class ShowResultManager : MonoBehaviour
 {
-    public void Initialize(VisionAiDataSource visionAiDataSource)
+    private IDisposable _progressSubscription;
+    private IDisposable _resultSubscription;
+
+    public void Initialize(
+        VisionAiDataSource visionAiDataSource,
+        TMP_Text resultText)
     {
-        // Initialize the ImageCaptureManager with the VisionAiDataSource
-    }
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
-    {
-        
+        _progressSubscription?.Dispose();
+        _resultSubscription?.Dispose();
+
+        _progressSubscription = visionAiDataSource.ProgressReports
+            .Subscribe(report => resultText.text = FormatProgress(report));
+        _resultSubscription = visionAiDataSource.ResultText
+            .Subscribe(result => resultText.text = result);
     }
 
-    // Update is called once per frame
-    void Update()
+    private static string FormatProgress(VisionAiProgressReport report)
     {
-        
+        return report.Progress01.HasValue
+            ? $"{report.Message} {report.Progress01.Value:P0}"
+            : report.Message;
+    }
+
+    private void OnDestroy()
+    {
+        _progressSubscription?.Dispose();
+        _resultSubscription?.Dispose();
     }
 }

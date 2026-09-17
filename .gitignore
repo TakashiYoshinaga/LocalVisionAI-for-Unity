@@ -113,6 +113,8 @@ InitTestScene*.unity*
 # Local AI models and temporary extraction files
 *.litertlm
 *.litertlm.meta
+*.litertlm.sha256
+*.litertlm.sha256.meta
 *.partial
 *.partial.meta
 

@@ -7,17 +7,18 @@ public class MainCoordinator : MonoBehaviour
     [SerializeField] private ShowResultManager _showResultManager;
     [SerializeField] private TMPro.TMP_Text _resultText;
 
-    private VisionAiDataSource _visionAiDataSource = new VisionAiDataSource();
+    private readonly VisionAiDataSource _visionAiDataSource = new();
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    private void Start()
     {
-        
+        _imageCaptureManager.Initialize(_visionAiDataSource);
+        _showResultManager.Initialize(_visionAiDataSource, _resultText);
+        _visionAiManager.Initialize(_visionAiDataSource);
     }
 
-    // Update is called once per frame
-    void Update()
+    private void OnDestroy()
     {
-        
+        _visionAiManager.Shutdown();
+        _visionAiDataSource.Dispose();
     }
 }
