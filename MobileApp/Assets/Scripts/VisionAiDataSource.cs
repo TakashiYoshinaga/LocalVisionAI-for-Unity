@@ -1,26 +1,36 @@
-using UnityEngine;
+using System;
 using R3;
-public class VisionAiDataSource
+using UnityEngine;
+
+public sealed class VisionAiDataSource : IDisposable
 {
-    Subject<Texture2D> _imageDtataSubject = new Subject<Texture2D>();
-    Subject<string> _rexultTextSubject = new Subject<string>();
+    private readonly Subject<Texture2D> _imageDataSubject = new();
+    private readonly Subject<string> _resultTextSubject = new();
+    private readonly Subject<VisionAiProgressReport> _progressSubject = new();
 
-    Observable<Texture2D> _imageDataObservable;
-    Observable<string> _resultTextObservable;
+    public Observable<Texture2D> ImageData => _imageDataSubject;
+    public Observable<string> ResultText => _resultTextSubject;
+    public Observable<VisionAiProgressReport> ProgressReports => _progressSubject;
 
-    public VisionAiDataSource()
+    public void PublishImageData(Texture2D imageData)
     {
-        _imageDataObservable = _imageDtataSubject.AsObservable();
-        _resultTextObservable = _rexultTextSubject.AsObservable();
+        _imageDataSubject.OnNext(imageData);
     }
 
-    public void SetImageData(Texture2D imageData)
+    public void PublishResultText(string resultText)
     {
-        _imageDtataSubject.OnNext(imageData);
+        _resultTextSubject.OnNext(resultText);
     }
 
-    public void SetResultText(string resultText)
+    public void PublishProgress(VisionAiProgressReport report)
     {
-        _rexultTextSubject.OnNext(resultText);
+        _progressSubject.OnNext(report);
+    }
+
+    public void Dispose()
+    {
+        _imageDataSubject.Dispose();
+        _resultTextSubject.Dispose();
+        _progressSubject.Dispose();
     }
 }

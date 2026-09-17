@@ -1,0 +1,365 @@
+package com.takashiyoshinaga.localvisionai
+
+import android.content.res.AssetManager
+import android.os.StatFs
+import com.unity3d.player.UnityPlayer
+import org.json.JSONObject
+import java.io.File
+import java.io.FileNotFoundException
+import java.io.FileOutputStream
+import java.io.IOException
+import java.security.MessageDigest
+import java.util.Locale
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+
+object BundledModelBridge {
+    private const val MODELS_DIRECTORY = "Models"
+    private const val BUFFER_SIZE = 1024 * 1024
+    private const val STORAGE_MARGIN_BYTES = 16L * 1024L * 1024L
+    private const val PROGRESS_STEP = 0.01f
+
+    private val executor = Executors.newSingleThreadExecutor()
+    private val isPreparing = AtomicBoolean(false)
+
+    @JvmStatic
+    fun prepareBundledModel(
+        callbackGameObject: String,
+        assetPath: String,
+        destinationFileName: String
+    ) {
+        if (!isPreparing.compareAndSet(false, true)) {
+            send(
+                callbackGameObject,
+                "ExtractingModel",
+                "AI model setup is already running.",
+                null,
+                ready = false,
+                retryable = false
+            )
+            return
+        }
+
+        executor.execute {
+            try {
+                prepare(
+                    callbackGameObject,
+                    assetPath,
+                    destinationFileName
+                )
+            } catch (exception: FileNotFoundException) {
+                sendError(
+                    callbackGameObject,
+                    "Bundled AI model or verification metadata was not found in this APK.",
+                    retryable = false
+                )
+            } catch (exception: InsufficientStorageException) {
+                sendError(
+                    callbackGameObject,
+                    "Not enough free storage to extract the AI model.",
+                    retryable = true
+                )
+            } catch (exception: ModelIntegrityException) {
+                sendError(
+                    callbackGameObject,
+                    "Bundled AI model verification failed. Reinstall the APK and try again.",
+                    retryable = true
+                )
+            } catch (exception: IOException) {
+                sendError(
+                    callbackGameObject,
+                    "Could not extract the bundled AI model: ${safeMessage(exception)}",
+                    retryable = true
+                )
+            } catch (exception: Exception) {
+                sendError(
+                    callbackGameObject,
+                    "Unexpected model setup error: ${safeMessage(exception)}",
+                    retryable = true
+                )
+            } finally {
+                isPreparing.set(false)
+            }
+        }
+    }
+
+    private fun prepare(
+        callbackGameObject: String,
+        assetPath: String,
+        destinationFileName: String
+    ) {
+        val activity = UnityPlayer.currentActivity
+            ?: throw IllegalStateException("Unity activity is unavailable.")
+        val metadata = readMetadata(activity.assets, "$assetPath.sha256")
+        val modelsDirectory = File(activity.noBackupFilesDir, MODELS_DIRECTORY)
+
+        if (!modelsDirectory.exists() && !modelsDirectory.mkdirs()) {
+            throw IOException("Could not create the private model directory.")
+        }
+
+        val destination = File(modelsDirectory, destinationFileName)
+        val partial = File(modelsDirectory, "$destinationFileName.partial")
+        val verification = File(modelsDirectory, "$destinationFileName.verified")
+
+        if (isVerified(destination, verification, metadata)) {
+            send(
+                callbackGameObject,
+                "Initializing",
+                "Bundled AI model is ready.",
+                null,
+                ready = true,
+                retryable = false,
+                modelPath = destination.absolutePath
+            )
+            return
+        }
+
+        ensureEnoughStorage(modelsDirectory, metadata.size)
+        deleteIfPresent(partial)
+
+        send(
+            callbackGameObject,
+            "ExtractingModel",
+            "Extracting bundled AI model...",
+            0f,
+            ready = false,
+            retryable = true
+        )
+
+        val digest = MessageDigest.getInstance("SHA-256")
+        var copiedBytes = 0L
+        var lastReportedProgress = -1f
+
+        try {
+            FileOutputStream(partial).use { output ->
+                val buffer = ByteArray(BUFFER_SIZE)
+
+                for (partIndex in 0 until metadata.partCount) {
+                    val partPath = partAssetPath(assetPath, partIndex)
+
+                    activity.assets.open(partPath, AssetManager.ACCESS_STREAMING)
+                        .use { input ->
+                            while (true) {
+                                val read = input.read(buffer)
+                                if (read < 0) {
+                                    break
+                                }
+
+                                output.write(buffer, 0, read)
+                                digest.update(buffer, 0, read)
+                                copiedBytes += read
+
+                                val progress = if (metadata.size > 0L) {
+                                    (copiedBytes.toDouble() / metadata.size.toDouble())
+                                        .coerceIn(0.0, 1.0)
+                                        .toFloat()
+                                } else {
+                                    0f
+                                }
+
+                                if (progress - lastReportedProgress >= PROGRESS_STEP) {
+                                    lastReportedProgress = progress
+                                    send(
+                                        callbackGameObject,
+                                        "ExtractingModel",
+                                        "Extracting bundled AI model...",
+                                        progress,
+                                        ready = false,
+                                        retryable = true
+                                    )
+                                }
+                            }
+                        }
+                }
+
+                output.fd.sync()
+            }
+
+            val copiedHash = digest.digest().toHex()
+            if (copiedBytes != metadata.size ||
+                !copiedHash.equals(metadata.sha256, ignoreCase = true)) {
+                throw ModelIntegrityException()
+            }
+
+            replaceFile(partial, destination)
+            writeVerification(verification, metadata)
+
+            send(
+                callbackGameObject,
+                "Initializing",
+                "Bundled AI model is ready.",
+                null,
+                ready = true,
+                retryable = false,
+                modelPath = destination.absolutePath
+            )
+        } catch (exception: Exception) {
+            deleteQuietly(partial)
+            throw exception
+        }
+    }
+
+    private fun readMetadata(
+        assets: AssetManager,
+        metadataAssetPath: String
+    ): ModelMetadata {
+        val values = mutableMapOf<String, String>()
+
+        assets.open(metadataAssetPath, AssetManager.ACCESS_STREAMING)
+            .bufferedReader(Charsets.UTF_8)
+            .useLines { lines ->
+                lines.forEach { line ->
+                    val separator = line.indexOf('=')
+                    if (separator > 0) {
+                        values[line.substring(0, separator)] =
+                            line.substring(separator + 1)
+                    }
+                }
+            }
+
+        val hash = values["sha256"]
+        val size = values["size"]?.toLongOrNull()
+        val partCount = values["parts"]?.toIntOrNull() ?: 1
+        if (hash == null || hash.length != 64 || size == null || size <= 0L ||
+            partCount <= 0) {
+            throw ModelIntegrityException()
+        }
+
+        return ModelMetadata(hash.lowercase(), size, partCount)
+    }
+
+    private fun isVerified(
+        destination: File,
+        verification: File,
+        metadata: ModelMetadata
+    ): Boolean {
+        if (!destination.isFile ||
+            destination.length() != metadata.size ||
+            !verification.isFile) {
+            return false
+        }
+
+        return try {
+            val values = verification.readLines(Charsets.UTF_8)
+                .mapNotNull { line ->
+                    val separator = line.indexOf('=')
+                    if (separator > 0) {
+                        line.substring(0, separator) to
+                            line.substring(separator + 1)
+                    } else {
+                        null
+                    }
+                }
+                .toMap()
+
+            values["sha256"].equals(metadata.sha256, ignoreCase = true) &&
+                values["size"]?.toLongOrNull() == metadata.size
+        } catch (_: IOException) {
+            false
+        }
+    }
+
+    private fun ensureEnoughStorage(directory: File, requiredBytes: Long) {
+        val availableBytes = StatFs(directory.absolutePath).availableBytes
+        if (availableBytes < requiredBytes + STORAGE_MARGIN_BYTES) {
+            throw InsufficientStorageException()
+        }
+    }
+
+    private fun replaceFile(source: File, destination: File) {
+        deleteIfPresent(destination)
+        if (!source.renameTo(destination)) {
+            throw IOException("Could not finalize the extracted model.")
+        }
+    }
+
+    private fun writeVerification(
+        verification: File,
+        metadata: ModelMetadata
+    ) {
+        val temporary = File(verification.parentFile, "${verification.name}.partial")
+        deleteIfPresent(temporary)
+
+        FileOutputStream(temporary).use { output ->
+            output.write(
+                "sha256=${metadata.sha256}\nsize=${metadata.size}\n"
+                    .toByteArray(Charsets.UTF_8)
+            )
+            output.fd.sync()
+        }
+
+        replaceFile(temporary, verification)
+    }
+
+    private fun deleteQuietly(file: File) {
+        try {
+            deleteIfPresent(file)
+        } catch (_: IOException) {
+        }
+    }
+
+    private fun deleteIfPresent(file: File) {
+        if (file.exists() && !file.delete()) {
+            throw IOException("Could not replace stale model data.")
+        }
+    }
+
+    private fun sendError(
+        callbackGameObject: String,
+        message: String,
+        retryable: Boolean
+    ) {
+        send(
+            callbackGameObject,
+            "Error",
+            message,
+            null,
+            ready = false,
+            retryable = retryable
+        )
+    }
+
+    private fun send(
+        callbackGameObject: String,
+        phase: String,
+        message: String,
+        progress01: Float?,
+        ready: Boolean,
+        retryable: Boolean,
+        modelPath: String = ""
+    ) {
+        val payload = JSONObject()
+            .put("phase", phase)
+            .put("message", message)
+            .put("hasProgress", progress01 != null)
+            .put("progress01", progress01 ?: 0f)
+            .put("ready", ready)
+            .put("retryable", retryable)
+            .put("modelPath", modelPath)
+            .toString()
+
+        UnityPlayer.UnitySendMessage(
+            callbackGameObject,
+            "OnBundledModelProgress",
+            payload
+        )
+    }
+
+    private fun partAssetPath(assetPath: String, partIndex: Int): String =
+        String.format(Locale.US, "%s.part%03d", assetPath, partIndex)
+
+    private fun ByteArray.toHex(): String =
+        joinToString(separator = "") { byte -> "%02x".format(byte) }
+
+    private fun safeMessage(exception: Exception): String =
+        exception.message?.take(160) ?: exception.javaClass.simpleName
+
+    private data class ModelMetadata(
+        val sha256: String,
+        val size: Long,
+        val partCount: Int
+    )
+
+    private class InsufficientStorageException : IOException()
+    private class ModelIntegrityException : IOException()
+}
