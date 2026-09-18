@@ -30,6 +30,8 @@ namespace LiteRtLmUnity
         [Header("Prompt")]
         [SerializeField, TextArea(3, 10)] private string _systemPrompt = "";
         [SerializeField, TextArea(3, 10)] private string _userPrompt = "";
+        [SerializeField, TextArea(2, 5)] private string _fallbackImagePrompt =
+            "Describe what is visible in this image clearly and concisely.";
 
         private VisionAiDataSource _dataSource;
         private Action<bool> _onRetryAvailabilityChanged;
@@ -294,7 +296,7 @@ namespace LiteRtLmUnity
             {
                 string effectiveUserPrompt = string.IsNullOrWhiteSpace(_userPrompt) &&
                                              string.IsNullOrWhiteSpace(_systemPrompt)
-                    ? request.Prompt
+                    ? _fallbackImagePrompt
                     : _userPrompt;
 
                 using AndroidJavaClass bridge = new(AndroidBridgeClass);

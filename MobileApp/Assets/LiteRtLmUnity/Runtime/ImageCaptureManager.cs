@@ -11,8 +11,6 @@ namespace LiteRtLmUnity
     {
         private const int MaxImageDimension = 1024;
         private const int JpegQuality = 85;
-        private const string DefaultPrompt =
-            "Describe what is visible in this image clearly and concisely.";
 
         [SerializeField] private ARCameraManager _cameraManager;
 
@@ -117,8 +115,7 @@ namespace LiteRtLmUnity
                 var request = new VisionAiRequest(
                     jpegData,
                     orientedTexture.width,
-                    orientedTexture.height,
-                    DefaultPrompt);
+                    orientedTexture.height);
 
                 // ImageRequests is marshalled to the next main-thread frame. Lock
                 // capture immediately so the button cannot briefly re-enable.
