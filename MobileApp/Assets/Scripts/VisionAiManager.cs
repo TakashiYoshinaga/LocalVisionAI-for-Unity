@@ -18,6 +18,10 @@ public class VisionAiManager : MonoBehaviour
     [Tooltip("Maximum answer tokens. 0 or less means no limit.")]
     [SerializeField] private int _answerTokenBudget;
 
+    [Header("Prompt")]
+    [SerializeField, TextArea(3, 10)] private string _systemPrompt = "";
+    [SerializeField, TextArea(3, 10)] private string _userPrompt = "";
+
     private VisionAiDataSource _dataSource;
     private Action<bool> _onRetryAvailabilityChanged;
     private IDisposable _imageRequestSubscription;
@@ -32,6 +36,13 @@ public class VisionAiManager : MonoBehaviour
     public bool EnableThinking => _enableThinking;
     public int ThinkingTokenBudget => _thinkingTokenBudget;
     public int AnswerTokenBudget => _answerTokenBudget;
+    public string SystemPrompt => _systemPrompt;
+    public string UserPrompt => _userPrompt;
+
+    public void SetUserPrompt(string prompt)
+    {
+        _userPrompt = prompt ?? string.Empty;
+    }
 
     /// <summary>
     /// Reports whether the failed setup can be retried through
@@ -214,15 +225,35 @@ public class VisionAiManager : MonoBehaviour
 
         try
         {
+            string effectiveUserPrompt = string.IsNullOrWhiteSpace(_userPrompt) &&
+                                         string.IsNullOrWhiteSpace(_systemPrompt)
+                ? request.Prompt
+                : _userPrompt;
+
             using AndroidJavaClass bridge = new(AndroidBridgeClass);
+
+            // AndroidJavaClass.CallStatic cannot express named arguments, so
+            // these values must stay in the same order as
+            // BundledModelBridge.analyze in BundledModelBridge.kt.
             bridge.CallStatic(
+                // Static Kotlin method to invoke.
                 "analyze",
+                // Name of the GameObject that hosts this VisionAiManager.
+                // Kotlin uses UnitySendMessage to invoke its callback methods.
                 gameObject.name,
+                // Identifies this request so stale callbacks can be ignored.
                 _activeRequestId,
+                // Captured camera image encoded as JPEG bytes.
                 request.JpegData,
-                request.Prompt,
+                // Conversation-level instruction that controls model behavior.
+                _systemPrompt,
+                // Per-request question or instruction entered by the user.
+                effectiveUserPrompt,
+                // Whether the model may generate an internal thinking channel.
                 _enableThinking,
+                // Maximum tokens allocated to the internal thinking channel.
                 _thinkingTokenBudget,
+                // Maximum answer tokens; 0 or less uses the model default.
                 _answerTokenBudget);
         }
         catch (Exception exception)

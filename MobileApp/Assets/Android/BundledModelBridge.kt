@@ -149,7 +149,8 @@ object BundledModelBridge {
         callbackGameObject: String,
         requestId: Int,
         imageData: ByteArray,
-        prompt: String,
+        systemPrompt: String,
+        userPrompt: String,
         enableThinking: Boolean,
         thinkingTokenBudget: Int,
         answerTokenBudget: Int
@@ -170,7 +171,8 @@ object BundledModelBridge {
                     callbackGameObject,
                     requestId,
                     imageData,
-                    prompt,
+                    systemPrompt,
+                    userPrompt,
                     enableThinking,
                     thinkingTokenBudget,
                     answerTokenBudget
@@ -281,7 +283,8 @@ object BundledModelBridge {
         callbackGameObject: String,
         requestId: Int,
         imageData: ByteArray,
-        prompt: String,
+        systemPrompt: String,
+        userPrompt: String,
         enableThinking: Boolean,
         thinkingTokenBudget: Int,
         answerTokenBudget: Int
@@ -302,10 +305,11 @@ object BundledModelBridge {
             "Analyzing image..."
         )
 
-        val contents = Contents.of(
-            Content.ImageBytes(imageData),
-            Content.Text(prompt)
-        )
+        val contents = if (userPrompt.isBlank()) {
+            Contents.of(Content.ImageBytes(imageData))
+        } else {
+            Contents.of(Content.ImageBytes(imageData), Content.Text(userPrompt))
+        }
         val startedAt = SystemClock.elapsedRealtime()
 
         // One conversation per request. This PoC describes a single image, so
@@ -313,6 +317,9 @@ object BundledModelBridge {
         // Thinking is configured here rather than on the engine, so changing it
         // never reloads the model.
         val config = ConversationConfig(
+            systemInstruction = systemPrompt
+                .takeIf { it.isNotBlank() }
+                ?.let { Contents.of(it) },
             channels = if (enableThinking) listOf(thinkingChannel) else emptyList(),
             maxOutputToken = if (answerTokenBudget > 0) answerTokenBudget else null,
             thinkingConfig = ThinkingConfig(enableThinking, thinkingTokenBudget)

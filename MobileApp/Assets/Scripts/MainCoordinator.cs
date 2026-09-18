@@ -7,14 +7,18 @@ using UnityEngine;
 /// </summary>
 public class MainCoordinator : MonoBehaviour
 {
-    private const string CaptureLabel = "Analyze Camera";
+    private const string CaptureLabel = "Search";
     private const string RetryLabel = "Retry Setup";
 
+    [Header("Logic Managers")]
     [SerializeField] private ImageCaptureManager _imageCaptureManager;
     [SerializeField] private VisionAiManager _visionAiManager;
     [SerializeField] private ShowResultManager _showResultManager;
+    [Header("UI Elements")]
     [SerializeField] private TMPro.TMP_Text _resultText;
     [SerializeField] private UnityEngine.UI.Button _captureButton;
+    [SerializeField] private TMPro.TMP_InputField _userPromptInputField;
+    [SerializeField] private UnityEngine.UI.ScrollRect _resultScrollRect;
 
     private readonly VisionAiDataSource _visionAiDataSource = new();
 
@@ -23,6 +27,17 @@ public class MainCoordinator : MonoBehaviour
     private bool _retryAvailable;
 
     private void Start()
+    {
+        InitializeUI();
+
+        // The display subscribes first so that it also shows whatever the
+        // other managers report while they start up.
+        _showResultManager.Initialize(_visionAiDataSource, SetResultText);
+        _imageCaptureManager.Initialize(_visionAiDataSource, SetCaptureAvailable);
+        _visionAiManager.Initialize(_visionAiDataSource, SetRetryAvailable);
+    }
+
+    private void InitializeUI()
     {
         if (_resultText == null)
         {
@@ -40,11 +55,15 @@ public class MainCoordinator : MonoBehaviour
             _captureButton.interactable = false;
         }
 
-        // The display subscribes first so that it also shows whatever the
-        // other managers report while they start up.
-        _showResultManager.Initialize(_visionAiDataSource, SetResultText);
-        _imageCaptureManager.Initialize(_visionAiDataSource, SetCaptureAvailable);
-        _visionAiManager.Initialize(_visionAiDataSource, SetRetryAvailable);
+        if (_userPromptInputField == null)
+        {
+            Debug.LogError("MainCoordinator: the user prompt input is not assigned.");
+        }
+
+        if (_resultScrollRect == null)
+        {
+            Debug.LogError("MainCoordinator: the result scroll view is not assigned.");
+        }
     }
 
     /// <summary>
@@ -59,6 +78,9 @@ public class MainCoordinator : MonoBehaviour
             return;
         }
 
+        _visionAiManager.SetUserPrompt(_userPromptInputField != null
+            ? _userPromptInputField.text
+            : string.Empty);
         _imageCaptureManager.CaptureCameraImage();
     }
 
@@ -94,6 +116,12 @@ public class MainCoordinator : MonoBehaviour
         if (_resultText != null)
         {
             _resultText.text = text;
+
+            if (_resultScrollRect != null)
+            {
+                Canvas.ForceUpdateCanvases();
+                _resultScrollRect.verticalNormalizedPosition = 1f;
+            }
         }
     }
 
