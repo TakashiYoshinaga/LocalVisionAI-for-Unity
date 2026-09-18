@@ -757,7 +757,9 @@ MonoBehaviour:
   _answerTokenBudget: 512
   _slowAnalysisWarningSeconds: 30
   _analysisTimeoutSeconds: 120
-  _systemPrompt: "\u4F55\u304C\u5199\u3063\u3066\u3044\u308B\u304B\u3092\u7AEF\u7684\u306B\u3002\u3059\u3079\u3066\u3092\u8A18\u8FF0\u3059\u308B\u5FC5\u8981\u306F\u306A\u304F\u30AD\u30FC\u3068\u306A\u308B\u98A8\u666F\u60C5\u5831\u3092\u8FF0\u3079\u308B\u3053\u3068\u3002"
+  _systemPrompt: "Describe concisely what appears in this image. You don't need to
+    capture every detail\u2014just highlight the key landscape and scenery information
+    (main subjects, setting, terrain, lighting, atmosphere). Respond in English."
   _userPrompt: 
 --- !u!4 &705766225
 Transform:
