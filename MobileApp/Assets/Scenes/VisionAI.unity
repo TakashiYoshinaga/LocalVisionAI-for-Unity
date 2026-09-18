@@ -1737,6 +1737,7 @@ GameObject:
   - component: {fileID: 984393085}
   - component: {fileID: 984393087}
   - component: {fileID: 984393086}
+  - component: {fileID: 984393088}
   m_Layer: 0
   m_Name: InputPanel
   m_TagString: Untagged
@@ -1803,6 +1804,19 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 984393084}
   m_CullTransparentMesh: 1
+--- !u!114 &984393088
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 984393084}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8505a1ca7edf8fb46ac2d1643294698e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InputFieldPositionOptimizer
+  _userPromptInputField: {fileID: 826636528}
 --- !u!1 &992736699
 GameObject:
   m_ObjectHideFlags: 0

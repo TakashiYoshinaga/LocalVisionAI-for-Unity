@@ -9,8 +9,6 @@ public class MainCoordinator : MonoBehaviour
 {
     private const string CaptureLabel = "Search";
     private const string RetryLabel = "Retry Setup";
-    private const float KeyboardMargin = 16f;
-    private const float KeyboardMoveDuration = 0.18f;
 
     [Header("Logic Managers")]
     [SerializeField] private ImageCaptureManager _imageCaptureManager;
@@ -25,16 +23,8 @@ public class MainCoordinator : MonoBehaviour
     private readonly VisionAiDataSource _visionAiDataSource = new();
 
     private TMPro.TMP_Text _captureButtonLabel;
-    private RectTransform _inputPanelRectTransform;
-    private RectTransform _inputPanelParentRectTransform;
-    private Canvas _inputPanelCanvas;
-    private Vector2 _inputPanelRestingPosition;
-    private float _inputPanelMoveVelocity;
-    private bool _inputPanelPositionInitialized;
     private bool _captureAvailable;
     private bool _retryAvailable;
-
-    private readonly Vector3[] _inputPanelWorldCorners = new Vector3[4];
 
     private void Start()
     {
@@ -69,106 +59,11 @@ public class MainCoordinator : MonoBehaviour
         {
             Debug.LogError("MainCoordinator: the user prompt input is not assigned.");
         }
-        else
-        {
-            InitializeInputPanelPosition();
-        }
 
         if (_resultScrollRect == null)
         {
             Debug.LogError("MainCoordinator: the result scroll view is not assigned.");
         }
-    }
-
-    private void InitializeInputPanelPosition()
-    {
-        _inputPanelRectTransform = _userPromptInputField.transform.parent as RectTransform;
-
-        if (_inputPanelRectTransform == null)
-        {
-            Debug.LogError("MainCoordinator: the user prompt input must be inside an InputPanel RectTransform.");
-            return;
-        }
-
-        _inputPanelParentRectTransform = _inputPanelRectTransform.parent as RectTransform;
-        _inputPanelCanvas = _inputPanelRectTransform.GetComponentInParent<Canvas>();
-
-        if (_inputPanelParentRectTransform == null || _inputPanelCanvas == null)
-        {
-            Debug.LogError("MainCoordinator: the InputPanel must be inside a Canvas RectTransform.");
-            return;
-        }
-
-        _inputPanelRestingPosition = _inputPanelRectTransform.anchoredPosition;
-        _inputPanelPositionInitialized = true;
-    }
-
-    private void LateUpdate()
-    {
-        if (!_inputPanelPositionInitialized)
-        {
-            return;
-        }
-
-        float targetY = _inputPanelRestingPosition.y;
-
-        if (_userPromptInputField.isFocused)
-        {
-            targetY = GetKeyboardAvoidingPanelY();
-        }
-
-        Vector2 currentPosition = _inputPanelRectTransform.anchoredPosition;
-        currentPosition.y = Mathf.SmoothDamp(
-            currentPosition.y,
-            targetY,
-            ref _inputPanelMoveVelocity,
-            KeyboardMoveDuration,
-            Mathf.Infinity,
-            Time.unscaledDeltaTime);
-        _inputPanelRectTransform.anchoredPosition = currentPosition;
-    }
-
-    private float GetKeyboardAvoidingPanelY()
-    {
-        float keyboardTopScreenY = AndroidKeyboardInsetProvider.GetBottomInset();
-
-        if (keyboardTopScreenY <= 0f)
-        {
-            return _inputPanelRestingPosition.y;
-        }
-
-        Camera canvasCamera = _inputPanelCanvas.renderMode == RenderMode.ScreenSpaceOverlay
-            ? null
-            : _inputPanelCanvas.worldCamera;
-
-        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                _inputPanelParentRectTransform,
-                new Vector2(Screen.width * 0.5f, keyboardTopScreenY),
-                canvasCamera,
-                out Vector2 keyboardTopInParent))
-        {
-            return _inputPanelRestingPosition.y;
-        }
-
-        _inputPanelRectTransform.GetWorldCorners(_inputPanelWorldCorners);
-        float panelBottomInParent = _inputPanelParentRectTransform
-            .InverseTransformPoint(_inputPanelWorldCorners[0]).y;
-        float requiredMove = keyboardTopInParent.y + KeyboardMargin - panelBottomInParent;
-
-        return Mathf.Max(
-            _inputPanelRestingPosition.y,
-            _inputPanelRectTransform.anchoredPosition.y + requiredMove);
-    }
-
-    private void OnDisable()
-    {
-        if (!_inputPanelPositionInitialized)
-        {
-            return;
-        }
-
-        _inputPanelRectTransform.anchoredPosition = _inputPanelRestingPosition;
-        _inputPanelMoveVelocity = 0f;
     }
 
     /// <summary>
@@ -232,8 +127,6 @@ public class MainCoordinator : MonoBehaviour
 
     private void OnDestroy()
     {
-        AndroidKeyboardInsetProvider.Dispose();
-
         if (_captureButton != null)
         {
             _captureButton.onClick.RemoveListener(OnCaptureButtonClicked);
