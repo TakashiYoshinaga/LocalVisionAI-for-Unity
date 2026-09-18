@@ -4,10 +4,7 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes:
-  - enabled: 1
-    path: Assets/Scenes/VisionAI.unity
-    guid: 54bea29f9fbdc45ba8c6050316c21fcc
+  m_Scenes: []
   m_configObjects:
     UnityEditor.XR.ARCore.ARCoreSettings: {fileID: 11400000, guid: bafd8f15e009447c88647cd900d66a7a, type: 2}
     UnityEditor.XR.ARKit.ARKitSettings: {fileID: 11400000, guid: 409ce9f61a31043ffa6e09fdcfe937f7, type: 2}

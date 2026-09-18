@@ -19,7 +19,11 @@ public static class LocalVisionAiFontSetup
     private const string MainFontAssetPath =
         "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset";
 
-    private const string ScenePath = "Assets/Scenes/VisionAI.unity";
+    private static readonly string[] ScenePaths =
+    {
+        "Assets/Scenes/0-VisionAI-SystemPromptOnly.unity",
+        "Assets/Scenes/1-VisionAI-UserPrompt.unity"
+    };
     private const string SampleText = "English / 日本語 / 自動販売機";
 
     [MenuItem("Tools/Local Vision AI/Setup Japanese Font")]
@@ -46,7 +50,10 @@ public static class LocalVisionAiFontSetup
 
         ConfigureJapaneseFontAsset(japaneseFont);
         ConfigureMainFontFallback(japaneseFont);
-        ConfigureVisionAiScene();
+        foreach (string scenePath in ScenePaths)
+        {
+            ConfigureVisionAiScene(scenePath);
+        }
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
@@ -151,15 +158,15 @@ public static class LocalVisionAiFontSetup
         EditorUtility.SetDirty(mainFont);
     }
 
-    private static void ConfigureVisionAiScene()
+    private static void ConfigureVisionAiScene(string scenePath)
     {
-        Scene scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+        Scene scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
 
         GameObject canvasObject = GameObject.Find("Canvas");
         if (canvasObject == null ||
             canvasObject.GetComponent<UnityEngine.Canvas>() == null)
         {
-            throw new InvalidOperationException("Canvas was not found in VisionAI.unity.");
+            throw new InvalidOperationException($"Canvas was not found in {scenePath}.");
         }
 
         RectTransform canvasTransform =
@@ -175,7 +182,7 @@ public static class LocalVisionAiFontSetup
         if (resultText == null)
         {
             throw new InvalidOperationException(
-                "Canvas/Text (TMP) was not found in VisionAI.unity.");
+                $"Canvas/Text (TMP) was not found in {scenePath}.");
         }
 
         resultText.enableAutoSizing = false;
@@ -185,7 +192,7 @@ public static class LocalVisionAiFontSetup
         EditorSceneManager.MarkSceneDirty(scene);
         if (!EditorSceneManager.SaveScene(scene))
         {
-            throw new InvalidOperationException("Failed to save VisionAI.unity.");
+            throw new InvalidOperationException($"Failed to save {scenePath}.");
         }
     }
 }

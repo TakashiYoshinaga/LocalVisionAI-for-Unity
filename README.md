@@ -53,7 +53,12 @@ MobileApp/LocalModels/gemma-4-E2B-it.litertlm
 
 ### 2. ビルドする
 
-`MobileApp`をUnityで開き、`Assets/Scenes/VisionAI.unity`を開いてビルドします。コマンドラインからビルドする場合は次のメニューが使えます。
+`MobileApp`をUnityで開き、用途に応じて次のサンプルシーンを選びます。
+
+- `Assets/Scenes/0-VisionAI-SystemPromptOnly.unity`: Inspectorで設定した固定System Promptを使用する
+- `Assets/Scenes/1-VisionAI-UserPrompt.unity`: 画面からUser Promptを入力する
+
+使用するシーンをBuild Settingsへ追加してからビルドします。コマンドラインからビルドする場合は次のメニューが使えます。
 
 ```text
 Tools > Local Vision AI > Build Android APK
