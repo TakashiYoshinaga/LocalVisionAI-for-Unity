@@ -78,6 +78,10 @@ public class MainCoordinator : MonoBehaviour
             return;
         }
 
+        // Drop the previous answer before the managers report anything, so the
+        // camera view is never left sharing the screen with a stale result.
+        SetResultText(string.Empty);
+
         _visionAiManager.SetUserPrompt(_userPromptInputField != null
             ? _userPromptInputField.text
             : string.Empty);
