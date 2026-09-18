@@ -11,27 +11,29 @@ namespace LiteRtLmUnity
         private IDisposable _resultSubscription;
 
         /// <summary>
-        /// Formats progress and results into the text to show, and hands it to
-        /// <paramref name="onDisplayTextChanged"/>. The caller owns the UI, so this
-        /// class never touches a UI type.
+        /// Formats progress and results for their separate text sinks. The caller
+        /// owns the UI, so this class never touches a UI type.
         /// </summary>
         public void Initialize(
             VisionAiDataSource visionAiDataSource,
-            Action<string> onDisplayTextChanged)
+            Action<string> onStatusTextChanged,
+            Action<string> onResultTextChanged)
         {
             _progressSubscription?.Dispose();
             _resultSubscription?.Dispose();
 
-            if (onDisplayTextChanged == null)
+            if (onStatusTextChanged == null || onResultTextChanged == null)
             {
-                Debug.LogError("ShowResultManager was initialized without a text sink.");
+                Debug.LogError("ShowResultManager was initialized without all text sinks.");
                 return;
             }
 
             _progressSubscription = visionAiDataSource.ProgressReports
-                .Subscribe(report => onDisplayTextChanged(FormatProgress(report)));
+                .ObserveOnMainThread()
+                .Subscribe(report => onStatusTextChanged(FormatProgress(report)));
             _resultSubscription = visionAiDataSource.ResultText
-                .Subscribe(result => onDisplayTextChanged(ToDisplayText(result)));
+                .ObserveOnMainThread()
+                .Subscribe(result => onResultTextChanged(ToDisplayText(result)));
         }
 
         /// <summary>

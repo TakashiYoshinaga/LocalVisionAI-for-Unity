@@ -36,7 +36,9 @@ namespace LiteRtLmUnity
             _onCaptureAvailabilityChanged = onCaptureAvailabilityChanged;
 
             _onCaptureAvailabilityChanged?.Invoke(false);
+            _progressSubscription?.Dispose();
             _progressSubscription = _dataSource.ProgressReports
+                .ObserveOnMainThread()
                 .Subscribe(HandleProgressReport);
         }
 
@@ -118,9 +120,9 @@ namespace LiteRtLmUnity
                     orientedTexture.height,
                     DefaultPrompt);
 
-                _dataSource?.PublishResultText(
-                    $"Captured {request.Width} x {request.Height} image " +
-                    $"({request.JpegData.Length:N0} bytes JPEG).");
+                // ImageRequests is marshalled to the next main-thread frame. Lock
+                // capture immediately so the button cannot briefly re-enable.
+                _inferenceInProgress = true;
                 _dataSource?.PublishImageRequest(request);
             }
             catch (Exception exception)

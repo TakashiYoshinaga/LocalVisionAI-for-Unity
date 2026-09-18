@@ -17,9 +17,12 @@ public class MainCoordinator : MonoBehaviour
     [SerializeField] private ShowResultManager _showResultManager;
     [Header("UI Elements")]
     [SerializeField] private TMPro.TMP_Text _resultText;
+    [SerializeField] private TMPro.TMP_Text _statusText;
     [SerializeField] private UnityEngine.UI.Button _captureButton;
+    [SerializeField] private UnityEngine.UI.Button _closeResultButton;
     [SerializeField] private TMPro.TMP_InputField _userPromptInputField;
     [SerializeField] private UnityEngine.UI.ScrollRect _resultScrollRect;
+    [SerializeField] private GameObject _resultPanel;
 
     private readonly VisionAiDataSource _visionAiDataSource = new();
 
@@ -33,7 +36,7 @@ public class MainCoordinator : MonoBehaviour
 
         // The display subscribes first so that it also shows whatever the
         // other managers report while they start up.
-        _showResultManager.Initialize(_visionAiDataSource, SetResultText);
+        _showResultManager.Initialize(_visionAiDataSource, SetStatusText, SetResultText);
         _imageCaptureManager.Initialize(_visionAiDataSource, SetCaptureAvailable);
         _visionAiManager.Initialize(_visionAiDataSource, SetRetryAvailable);
     }
@@ -43,6 +46,11 @@ public class MainCoordinator : MonoBehaviour
         if (_resultText == null)
         {
             Debug.LogError("MainCoordinator: the result text is not assigned.");
+        }
+
+        if (_statusText == null)
+        {
+            Debug.LogError("MainCoordinator: the status text is not assigned.");
         }
 
         if (_captureButton == null)
@@ -64,6 +72,24 @@ public class MainCoordinator : MonoBehaviour
         if (_resultScrollRect == null)
         {
             Debug.LogError("MainCoordinator: the result scroll view is not assigned.");
+        }
+
+        if (_resultPanel == null)
+        {
+            Debug.LogError("MainCoordinator: the result panel is not assigned.");
+        }
+        else
+        {
+            _resultPanel.SetActive(false);
+        }
+
+        if (_closeResultButton == null)
+        {
+            Debug.LogError("MainCoordinator: the close result button is not assigned.");
+        }
+        else
+        {
+            _closeResultButton.onClick.AddListener(OnCloseResultButtonClicked);
         }
     }
 
@@ -122,7 +148,12 @@ public class MainCoordinator : MonoBehaviour
         {
             _resultText.text = text;
 
-            if (_resultScrollRect != null)
+            if (_resultPanel != null)
+            {
+                _resultPanel.SetActive(!string.IsNullOrEmpty(text));
+            }
+
+            if (_resultScrollRect != null && !string.IsNullOrEmpty(text))
             {
                 Canvas.ForceUpdateCanvases();
                 _resultScrollRect.verticalNormalizedPosition = 1f;
@@ -130,11 +161,29 @@ public class MainCoordinator : MonoBehaviour
         }
     }
 
+    private void SetStatusText(string text)
+    {
+        if (_statusText != null)
+        {
+            _statusText.text = text;
+        }
+    }
+
+    private void OnCloseResultButtonClicked()
+    {
+        SetResultText(string.Empty);
+    }
+
     private void OnDestroy()
     {
         if (_captureButton != null)
         {
             _captureButton.onClick.RemoveListener(OnCaptureButtonClicked);
+        }
+
+        if (_closeResultButton != null)
+        {
+            _closeResultButton.onClick.RemoveListener(OnCloseResultButtonClicked);
         }
 
         _visionAiManager.Shutdown();

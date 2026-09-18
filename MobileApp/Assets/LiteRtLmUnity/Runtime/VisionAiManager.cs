@@ -10,6 +10,7 @@ namespace LiteRtLmUnity
             "com.takashiyoshinaga.localvisionai.BundledModelBridge";
         private const string ModelAssetPath = BundledModelPaths.AndroidAssetPath;
         private const string ModelFileName = BundledModelPaths.FileName;
+        private const int DefaultAnswerTokenBudget = 512;
 
         [Header("Thinking")]
         [Tooltip("Applied at the start of each inference. Changing it never reloads the engine.")]
@@ -18,7 +19,13 @@ namespace LiteRtLmUnity
 
         [Header("Answer")]
         [Tooltip("Maximum answer tokens. 0 or less means no limit.")]
-        [SerializeField] private int _answerTokenBudget;
+        [SerializeField] private int _answerTokenBudget = DefaultAnswerTokenBudget;
+
+        [Header("Analysis Monitoring")]
+        [Tooltip("Show a long-running warning after this many seconds.")]
+        [SerializeField, Min(1)] private int _slowAnalysisWarningSeconds = 30;
+        [Tooltip("Show a timeout warning after this many seconds. The native inference remains locked until it returns.")]
+        [SerializeField, Min(1)] private int _analysisTimeoutSeconds = 120;
 
         [Header("Prompt")]
         [SerializeField, TextArea(3, 10)] private string _systemPrompt = "";
@@ -32,6 +39,10 @@ namespace LiteRtLmUnity
         private bool _inferenceInProgress;
         private int _lastRequestId;
         private int _activeRequestId;
+        private float _analysisStartedAt;
+        private int _lastReportedAnalysisSecond = -1;
+        private bool _slowAnalysisWarningLogged;
+        private bool _analysisTimeoutLogged;
 
         public string PreparedModelPath { get; private set; }
         public bool IsReady { get; private set; }
@@ -59,8 +70,61 @@ namespace LiteRtLmUnity
             _onRetryAvailabilityChanged?.Invoke(false);
             _imageRequestSubscription?.Dispose();
             _imageRequestSubscription = _dataSource.ImageRequests
+                .ObserveOnMainThread()
                 .Subscribe(AnalyzeImage);
             RetryModelSetup();
+        }
+
+        private void Update()
+        {
+            if (!_inferenceInProgress || _dataSource == null)
+            {
+                return;
+            }
+
+            int elapsedSeconds = Mathf.Max(
+                0,
+                Mathf.FloorToInt(Time.realtimeSinceStartup - _analysisStartedAt));
+            if (elapsedSeconds == _lastReportedAnalysisSecond)
+            {
+                return;
+            }
+
+            _lastReportedAnalysisSecond = elapsedSeconds;
+            string message;
+
+            if (elapsedSeconds >= _analysisTimeoutSeconds)
+            {
+                message = $"Analysis exceeded {_analysisTimeoutSeconds}s ({elapsedSeconds}s). Restart the app if it does not finish.";
+
+                if (!_analysisTimeoutLogged)
+                {
+                    _analysisTimeoutLogged = true;
+                    Debug.LogError(
+                        $"Image analysis request {_activeRequestId} exceeded the " +
+                        $"{_analysisTimeoutSeconds}s time limit. The native call is still running.");
+                }
+            }
+            else if (elapsedSeconds >= _slowAnalysisWarningSeconds)
+            {
+                message = $"Still analyzing... {elapsedSeconds}s";
+
+                if (!_slowAnalysisWarningLogged)
+                {
+                    _slowAnalysisWarningLogged = true;
+                    Debug.LogWarning(
+                        $"Image analysis request {_activeRequestId} is still running " +
+                        $"after {_slowAnalysisWarningSeconds}s.");
+                }
+            }
+            else
+            {
+                message = $"Analyzing image... {elapsedSeconds}s";
+            }
+
+            _dataSource.PublishProgress(new VisionAiProgressReport(
+                VisionAiPhase.Inferencing,
+                message));
         }
 
         /// <summary>
@@ -221,9 +285,10 @@ namespace LiteRtLmUnity
     #if UNITY_ANDROID && !UNITY_EDITOR
             _inferenceInProgress = true;
             _activeRequestId = ++_lastRequestId;
+            BeginAnalysisTracking();
             _dataSource.PublishProgress(new VisionAiProgressReport(
                 VisionAiPhase.Inferencing,
-                "Analyzing image..."));
+                "Analyzing image... 0s"));
 
             try
             {
@@ -261,6 +326,7 @@ namespace LiteRtLmUnity
             catch (Exception exception)
             {
                 _inferenceInProgress = false;
+                EndAnalysisTracking();
                 PublishError($"Could not start image analysis: {exception.Message}");
             }
     #else
@@ -279,6 +345,7 @@ namespace LiteRtLmUnity
             catch (Exception exception)
             {
                 _inferenceInProgress = false;
+                EndAnalysisTracking();
                 PublishError($"Invalid analysis response: {exception.Message}");
                 return;
             }
@@ -287,6 +354,7 @@ namespace LiteRtLmUnity
                 !Enum.TryParse(callback.phase, out VisionAiPhase phase))
             {
                 _inferenceInProgress = false;
+                EndAnalysisTracking();
                 PublishError("Invalid analysis response.");
                 return;
             }
@@ -305,6 +373,7 @@ namespace LiteRtLmUnity
             }
 
             _inferenceInProgress = false;
+            EndAnalysisTracking();
 
             if (phase == VisionAiPhase.Error)
             {
@@ -327,6 +396,7 @@ namespace LiteRtLmUnity
             _modelSetupInProgress = false;
             _engineInitializationInProgress = false;
             _inferenceInProgress = false;
+            EndAnalysisTracking();
             IsReady = false;
 
     #if UNITY_ANDROID && !UNITY_EDITOR
@@ -379,6 +449,26 @@ namespace LiteRtLmUnity
             _dataSource?.PublishProgress(new VisionAiProgressReport(
                 VisionAiPhase.Error,
                 message));
+        }
+
+        private void BeginAnalysisTracking()
+        {
+            _analysisStartedAt = Time.realtimeSinceStartup;
+            _lastReportedAnalysisSecond = -1;
+            _slowAnalysisWarningLogged = false;
+            _analysisTimeoutLogged = false;
+
+            Debug.Log(
+                $"Image analysis request {_activeRequestId} started " +
+                $"(thinking={_enableThinking}, thinkingTokens={_thinkingTokenBudget}, " +
+                $"answerTokens={_answerTokenBudget}).");
+        }
+
+        private void EndAnalysisTracking()
+        {
+            _lastReportedAnalysisSecond = -1;
+            _slowAnalysisWarningLogged = false;
+            _analysisTimeoutLogged = false;
         }
 
         [Serializable]
