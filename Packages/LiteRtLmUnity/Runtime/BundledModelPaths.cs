@@ -13,7 +13,9 @@ namespace LiteRtLmUnity
     {
         /// <summary>
         /// The model to bundle. The master file lives at
-        /// <c>MobileApp/LocalModels/&lt;FileName&gt;</c>, outside the asset database.
+        /// <c>LocalModels/&lt;FileName&gt;</c>, resolved against the Unity project
+        /// being built (<c>ARFoundationApp/LocalModels/</c> or
+        /// <c>SimpleMobileApp/LocalModels/</c>) and outside the asset database.
         /// </summary>
         public const string FileName = "gemma-4-E2B-it.litertlm";
 
