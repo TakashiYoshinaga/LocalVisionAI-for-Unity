@@ -1,174 +1,173 @@
 # LocalVisionAI
 
-Android端末のカメラで撮った写真の説明やテキスト入力による質問を、**端末の中だけで**実行するUnityサンプルです。通信は一切行わず、モデルもAPKに同梱されています。
+*[日本語版 README](README_JP.md)*
 
-推論にはGoogleの[LiteRT-LM](https://github.com/google-ai-edge/LiteRT-LM)とGemmaを使用します。カメラ画像の取得方法が異なる2つのUnityプロジェクトを収録しています。
+A Unity sample that describes photos taken with an Android device's camera, and answers typed questions, **entirely on the device**. It performs no network communication, and the model is bundled inside the APK.
 
-- `ARFoundationApp`: AR Foundation / ARCoreを使用するバージョン
-- `SimpleMobileApp`: `WebCamTexture`で通常の端末カメラを使用するバージョン
+Inference uses Google's [LiteRT-LM](https://github.com/google-ai-edge/LiteRT-LM) with Gemma. The repository contains two Unity projects that differ in how they obtain the camera image.
 
-`ARFoundationApp`は、今後AR機能を組み込めるようにAR Foundationでカメラを構成したバージョンです。現時点ではAR空間にオブジェクト、アンカー、平面認識結果などを表示する機能は実装していません。
+- `ARFoundationApp`: uses AR Foundation / ARCore
+- `SimpleMobileApp`: uses the ordinary device camera through `WebCamTexture`
 
-## デモ動画
+`ARFoundationApp` configures the camera through AR Foundation so that AR features can be added later. It does not currently place objects, anchors, or plane-detection results in AR space.
 
-[![LocalVisionAI OCRデモ](Documents/Materials/YouTubeThumbnail_OfflineVisionAI.png)](https://www.youtube.com/watch?v=gVoTzhzCqSQ)
+## Demo video
 
-[YouTubeでデモ動画を見る](https://www.youtube.com/watch?v=gVoTzhzCqSQ)
+[![LocalVisionAI OCR demo](Documents/Materials/YouTubeThumbnail_OfflineVisionAI.png)](https://www.youtube.com/watch?v=gVoTzhzCqSQ)
 
-## できること
+[Watch the demo on YouTube](https://www.youtube.com/watch?v=gVoTzhzCqSQ)
 
-- 端末カメラから静止画を1枚取得し、固定または入力したプロンプトと一緒にGemmaへ渡す
-- おまけとして、画像を使わず固定System Promptと入力したUser Promptだけで一回質問するテキスト版も収録
-- 生成された回答をスクロール可能な画面へ表示
+## What it does
 
-テキストサンプルは質問ごとに新しいConversationを作る一問一答です。会話履歴は保持しません。
+- Captures a single still image from the device camera and passes it to Gemma along with a fixed or typed prompt
+- Also includes, as a bonus, a text-only version that asks a single question using a fixed system prompt and a typed user prompt, with no image
+- Displays the generated answer in a scrollable view
 
-1回あたり数秒から数十秒かかります。端末の性能に大きく左右されます。
+The text sample creates a new conversation for every question — one question, one answer. No conversation history is kept.
 
-## 動作環境
+Each run takes from a few seconds to a few tens of seconds, and depends heavily on the device's performance.
+
+## Requirements
 
 | | |
 |---|---|
 | Unity | 6000.3.7f1 |
-| プラットフォーム | Android (ARM64) |
-| 最小APIレベル | 29 |
-| スクリプティング | IL2CPP |
-| 必要な空き容量 | 6〜8GB程度 |
+| Platform | Android (ARM64) |
+| Minimum API level | 29 |
+| Scripting backend | IL2CPP |
+| Free storage needed | roughly 6–8 GB |
 
-`ARFoundationApp`の画像サンプルにはARCore対応端末が必要です。`SimpleMobileApp`は通常の端末カメラを使用するため、ARCoreには依存しません。テキストサンプルは画像データを推論へ送りません。モデルの読み込みだけで2.5GB以上のメモリを使うため、RAMに余裕のある端末を推奨します。
+The image sample in `ARFoundationApp` requires an ARCore-capable device. `SimpleMobileApp` uses the ordinary device camera and does not depend on ARCore. The text sample never sends image data to inference. Loading the model alone uses more than 2.5 GB of memory, so a device with ample RAM is recommended.
 
-## 依存関係
+## Dependencies
 
-両プロジェクトで次のパッケージを使用します。
+Both projects use the following packages.
 
-| パッケージ | バージョン／導入方法 | 用途 |
+| Package | Version / installation | Purpose |
 |---|---|---|
-| R3 | 1.3.1 | イベント通知と状態管理 |
-| ObservableCollections / ObservableCollections.R3 | 3.3.4 | R3対応コレクション |
-| UniTask | Git URL | Unity向け非同期処理 |
-| `com.yoshinaga.litertlmunity` | `Packages/LiteRtLmUnity`のローカル参照 | モデル展開とLiteRT-LM連携 |
+| R3 | 1.3.1 | Event notification and state management |
+| ObservableCollections / ObservableCollections.R3 | 3.3.4 | R3-aware collections |
+| UniTask | Git URL | Async operations for Unity |
+| `com.yoshinaga.litertlmunity` | Local reference to `Packages/LiteRtLmUnity` | Model extraction and LiteRT-LM integration |
 
-`ARFoundationApp`だけは、さらにAR Foundation / ARCore 6.3.5を使用します。R3、ObservableCollections、UniTaskの登録とインストールについては、[R3とUniTaskの詳しいインストール手順](Documents/ExternalTools/R3_UniTask_Installation.md)を参照してください。
+`ARFoundationApp` additionally uses AR Foundation / ARCore 6.3.5. For registering and installing R3, ObservableCollections, and UniTask, see the [detailed R3 and UniTask installation guide](Documents/ExternalTools/R3_UniTask_Installation.md) (written in Japanese).
 
-LiteRT-LMのAndroidライブラリはビルド時にGradleのMaven依存として自動的に追加されるため、手動での導入は不要です。
+The LiteRT-LM Android library is added automatically as a Gradle Maven dependency at build time, so no manual installation is needed.
 
-## セットアップ
+## Setup
 
-### 1. モデルを用意する
+### 1. Prepare the model
 
-[litert-community/gemma-4-E2B-it-litert-lm](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm)から`gemma-4-E2B-it.litertlm`をダウンロードし、次の場所に置きます。
-
-使用するプロジェクトの`LocalModels`へ配置します。
+Download `gemma-4-E2B-it.litertlm` from [litert-community/gemma-4-E2B-it-litert-lm](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm) and place it in the `LocalModels` folder of the project you intend to use.
 
 ```text
 ARFoundationApp/LocalModels/gemma-4-E2B-it.litertlm
 SimpleMobileApp/LocalModels/gemma-4-E2B-it.litertlm
 ```
 
-`LocalModels/`ディレクトリは`.gitkeep`とともにリポジトリへ含まれていますが、`.litertlm`モデルファイルはGit管理外です。モデルは各自でダウンロードして配置してください。
+The `LocalModels/` directories are included in the repository along with their `.gitkeep` files, but `.litertlm` model files are not tracked by Git. Download and place the model yourself.
 
-> **同じリポジトリの`gemma-4-E2B-it-gpu.litertlm`は使えません。**
-> こちらはテキスト専用で画像エンコーダを含まないため、画像を渡すと
-> `NOT_FOUND: TF_LITE_VISION_ENCODER not found in the model.`で失敗します。
-> 画像に使えるモデルかどうかは次で判別できます。
+> **`gemma-4-E2B-it-gpu.litertlm` from the same repository will not work.**
+> It is text-only and contains no vision encoder, so passing an image fails with
+> `NOT_FOUND: TF_LITE_VISION_ENCODER not found in the model.`
+> You can check whether a model supports image input with:
 >
 > ```bash
-> LC_ALL=C grep -a -o -E "tf_lite_[a-z_]+" <モデル> | sort -u
+> LC_ALL=C grep -a -o -E "tf_lite_[a-z_]+" <model> | sort -u
 > ```
 >
-> `tf_lite_vision_encoder`が出力されれば画像入力に使えます。
+> If `tf_lite_vision_encoder` appears in the output, the model accepts image input.
 
-Gemma4 E2BではなくE4Bなど異なるモデルを使う場合は、ファイルを`LocalModels/`へ置き、`Assets/Scripts/BundledModelPaths.cs`の`FileName`を書き換えるだけです。
+To use a different model than Gemma 4 E2B — E4B, for example — place the file in `LocalModels/` and change `FileName` in `Packages/LiteRtLmUnity/Runtime/BundledModelPaths.cs`.
 
-### 2. ビルドする
+### 2. Build
 
-`ARFoundationApp`または`SimpleMobileApp`をUnityで開き、用途に応じて次のサンプルシーンを選びます。
+Open `ARFoundationApp` or `SimpleMobileApp` in Unity and pick the sample scene that matches what you want to do.
 
-- `Assets/Scenes/0-VisionAI-SystemPromptOnly.unity`: Inspectorで設定した固定System Promptを使用する
-- `Assets/Scenes/1-VisionAI-UserPrompt.unity`: 画面からUser Promptを入力する
-- `Assets/Scenes/2-VisionAI-TextPrompt.unity`: 画像なしでUser Promptを入力し、一回だけ質問する
+- `Assets/Scenes/0-VisionAI-SystemPromptOnly.unity`: uses the fixed system prompt configured in the Inspector
+- `Assets/Scenes/1-VisionAI-UserPrompt.unity`: lets you type a user prompt on screen
+- `Assets/Scenes/2-VisionAI-TextPrompt.unity`: asks a single question from a typed user prompt, with no image
 
-使用するシーンをBuild Settingsへ追加するかEditorで開くかしてからビルドします。
+Add the scene you want to Build Settings, or open it in the Editor, and then build.
 
-ビルド時に、`LocalModels/`のモデルが自動的に1GiB単位へ分割されて`StreamingAssets`へ配置されます。この分割は、Android Gradle Pluginが単一アセットを2GiB以上扱えないためのものです。分割されたファイルとハッシュはGit管理外です。
+At build time, the model in `LocalModels/` is automatically split into 1 GiB chunks and placed in `StreamingAssets`. This split exists because the Android Gradle Plugin cannot handle a single asset of 2 GiB or more. The split files and their hashes are not tracked by Git.
 
-APKは2.6GB前後になります。
+The resulting APK is around 2.6 GB.
 
-### 3. 実行する
+### 3. Run
 
-初回起動時に、APK内の分割ファイルが端末のプライベート領域へ結合・展開され、SHA-256で検証されます。進捗は画面に表示されます。2回目以降はこの処理をスキップします。(1分くらいかかります)
+On first launch, the split files inside the APK are merged and extracted into the device's private storage and verified with SHA-256. Progress is shown on screen. Later launches skip this step. (It takes about a minute.)
 
-展開が終わるとAIエンジンが初期化され、`AI Ready`と表示されたら画像シーンでは`Search`、テキストシーンでは入力後に`Send`が押せるようになります。
+Once extraction finishes, the AI engine is initialized. When `AI Ready` appears, `Search` becomes available in the image scenes, and `Send` becomes available after typing in the text scene.
 
+## Tips: extracting only text and numbers from a chosen subject
 
-
-## Tips: 指定した対象から文字と数値だけを抽出する
-
-両プロジェクトの`1-VisionAI-UserPrompt`シーンは、OCRのような使い方もできます。Hierarchyの`LLM Manager`を選択し、`LlmManager`のSystem Promptへ次のように設定します。
+The `1-VisionAI-UserPrompt` scene in either project can also be used like OCR. Select `LLM Manager` in the Hierarchy and set the System Prompt on `LlmManager` to something like this:
 
 ```text
-ユーザーが指定した対象だけを確認し、そこに書かれている文字列と数値のみを抽出してください。内容を意味のまとまりごとに整理し、「- 項目名: 読み取った値」の形式で箇条書きにしてください。対象外の情報は含めず、判読できない文字は推測せず「判読不能」と記載してください。
+Look only at the subject the user specifies and extract only the text and numbers written on it. Organize the content into meaningful groups and list it as "- label: value". Do not include anything outside the specified subject, and do not guess at illegible characters — write "illegible" instead.
 ```
 
-実行時のUser Promptには、[デモ動画](https://www.youtube.com/watch?v=gVoTzhzCqSQ)のように読み取り対象を指定します。
+At run time, name the subject you want read in the user prompt, as in the [demo video](https://www.youtube.com/watch?v=gVoTzhzCqSQ):
 
 ```text
-右側のモニターに表示されている内容
+The content shown on the monitor on the right
 ```
 
-対象を限定することで、画像全体の説明ではなく、指定した物体に書かれた文字列と数値だけを取得しやすくなります。
+Narrowing the subject makes it much easier to get just the text and numbers written on that object, rather than a description of the whole image.
 
-## 設定
+## Settings
 
-Hierarchyの`LLM Manager`が持つ`LlmManager`のInspectorから変更できます。
+These can be changed in the Inspector of `LlmManager` on the `LLM Manager` object in the Hierarchy.
 
-| 項目 | 既定値 | 説明 |
+| Setting | Default | Description |
 |---|---|---|
-| Enable Thinking | オフ | 思考プロセスを有効にする。推論時間はおよそ倍になる |
-| Thinking Token Budget | 256 | 思考に使うトークン数の上限 |
-| Answer Token Budget | 512 | 回答の上限トークン数。0以下で無制限 |
+| Enable Thinking | Off | Enables the thinking process. Roughly doubles inference time |
+| Thinking Token Budget | 256 | Maximum number of tokens spent on thinking |
+| Answer Token Budget | 512 | Maximum tokens in the answer. Unlimited when 0 or less |
 
-思考の内容は画面にもログにも出力されません。設定を変えてもモデルの再読み込みは発生しません。
-推論中は経過秒数が表示され、30秒を超えると長時間警告、120秒を超えるとタイムアウト警告へ切り替わります。ネイティブ推論は安全に中断できないため、タイムアウト後も完了しない場合はアプリを再起動してください。
+The thinking content is written neither to the screen nor to the log. Changing these settings does not reload the model.
 
-## 構成
+While inference is running, elapsed seconds are displayed. Past 30 seconds the display switches to a long-running warning, and past 120 seconds to a timeout warning. Native inference cannot be interrupted safely, so if it still does not finish after the timeout warning, restart the app.
 
-LLM部分は`Packages/LiteRtLmUnity`のUnityパッケージ（`com.yoshinaga.litertlmunity`）に切り出してあります。両サンプルプロジェクトからローカル参照で読み込んでいるので、他のプロジェクトへはこのフォルダを持っていくだけで再利用できます。
+## Structure
+
+The LLM portion is factored out into the Unity package at `Packages/LiteRtLmUnity` (`com.yoshinaga.litertlmunity`). Both sample projects reference it locally, so reusing it in another project is just a matter of copying that folder over.
 
 ```text
-Packages/LiteRtLmUnity/     再利用可能なLLM部分
-  Runtime/                  LiteRtLmUnityアセンブリ
-    LlmManager              モデル展開、エンジン初期化、推論を管理する
-    LlmDataSource           R3によるイベントハブ
-    ShowResultManager       進捗と結果を表示用の文字列へ整形する
-  Editor/                   LiteRtLmUnity.Editorアセンブリ
-    BundledModelBuildSetup  モデルを分割してStreamingAssetsへ配置する
-    LiteRtLmAndroidBuildSetup  生成されたGradleへLiteRT-LMの依存を追加する
+Packages/LiteRtLmUnity/     Reusable LLM portion
+  Runtime/                  LiteRtLmUnity assembly
+    LlmManager              Manages model extraction, engine init, and inference
+    LlmDataSource           R3-based event hub
+    ShowResultManager       Formats progress and results into display strings
+  Editor/                   LiteRtLmUnity.Editor assembly
+    BundledModelBuildSetup  Splits the model into StreamingAssets
+    LiteRtLmAndroidBuildSetup  Adds the LiteRT-LM dependency to the generated Gradle
   Android/
-    BundledModelBridge.kt   LiteRT-LMを呼ぶKotlin側の窓口
+    BundledModelBridge.kt   Kotlin-side entry point that calls LiteRT-LM
 
-ARFoundationApp/Assets/Scripts/  AR Foundation版固有の部分
-SimpleMobileApp/Assets/Scripts/  通常カメラ版固有の部分
-  ImagePromptCoordinator    画像SceneのUIを所有し、各Managerを繋ぐ
-  TextPromptCoordinator     テキスト専用SceneのUIと一問一答の送信を管理する
-  ImageCaptureManager       カメラ画像をJPEGへ変換して推論要求を作成する
-  CameraImageManager        通常カメラ版でプレビューと静止画取得を管理する
+ARFoundationApp/Assets/Scripts/  AR Foundation specific parts
+SimpleMobileApp/Assets/Scripts/  Ordinary camera specific parts
+  ImagePromptCoordinator    Owns the image scene UI and wires the managers together
+  TextPromptCoordinator     Owns the text-only scene UI and the one-shot send flow
+  ImageCaptureManager       Converts the camera image to JPEG and builds the request
+  CameraImageManager        Manages preview and still capture in the ordinary camera version
 ```
 
-UIの型を持つのは画像用の`ImagePromptCoordinator`とテキスト用の`TextPromptCoordinator`だけです。各Managerはコールバックで値を報告するだけなので、UIの実装から独立しています。カメラ方式に依存する処理はパッケージ側には入れず、各サンプルプロジェクト側に置いています。
+Only `ImagePromptCoordinator` (for images) and `TextPromptCoordinator` (for text) hold UI types. The managers merely report values through callbacks, so they are independent of the UI implementation. Anything that depends on the camera approach stays in the sample projects rather than in the package.
 
-## 制限事項
+## Limitations
 
-- 実機はPixel 7 (Android API 37)およびSamsung Galaxy S22で確認しています。他機種は未検証です。
-- 推論結果はストリーミング表示しません。完了までは経過時間と長時間警告のみ表示します。
-- テキストサンプルは会話履歴を保持しないため、前の質問を前提にした続きの会話はできません。
-- 撮影した画像は保存も送信もされません。
-- 縦向き以外の画面の向きは個別に確認していません。
+- Verified on a Pixel 7 (Android API 37) and a Samsung Galaxy S22. Other devices are untested.
+- Inference results are not streamed. Until completion, only the elapsed time and the long-running warning are shown.
+- The text sample keeps no conversation history, so you cannot ask follow-up questions that build on a previous one.
+- Captured images are neither saved nor transmitted.
+- Screen orientations other than portrait have not been verified individually.
 
-## ライセンス
+## License
 
-このリポジトリのコードはMIT Licenseです。[LICENSE](LICENSE)を参照してください。
+The code in this repository is MIT licensed. See [LICENSE](LICENSE).
 
-同梱するGemmaモデルは[Gemma Terms of Use](https://ai.google.dev/gemma/terms)に従います。モデルファイルはこのリポジトリには含まれていません。
+The bundled Gemma model is subject to the [Gemma Terms of Use](https://ai.google.dev/gemma/terms). The model file is not included in this repository.
 
-`Assets/Fonts/NotoSansJP`のNoto Sans JPはSIL Open Font License 1.1です。
+Noto Sans JP in `Assets/Fonts/NotoSansJP` is licensed under the SIL Open Font License 1.1.
