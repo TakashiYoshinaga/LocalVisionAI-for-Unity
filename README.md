@@ -15,7 +15,7 @@ Inference uses Google's [LiteRT-LM](https://github.com/google-ai-edge/LiteRT-LM)
 
 ## Demo video
 
-[![LocalVisionAI OCR demo](Documents/Materials/YouTubeThumbnail_OfflineVisionAI.png)](https://www.youtube.com/watch?v=gVoTzhzCqSQ)
+[![LocalVisionAI OCR demo](Documents/Materials/YouTubeThumbnail_OfflineVisionAI.png)](https://www.linkedin.com/posts/tks-yoshinaga_localllms-ocr-computervision-activity-7506653758345560064-FxHq)
 
 [Watch the demo on YouTube](https://www.youtube.com/watch?v=gVoTzhzCqSQ)
 

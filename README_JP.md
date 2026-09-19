@@ -15,7 +15,7 @@ Android端末のカメラで撮った写真の説明やテキスト入力によ�
 
 ## デモ動画
 
-[![LocalVisionAI OCRデモ](Documents/Materials/YouTubeThumbnail_OfflineVisionAI.png)](https://www.youtube.com/watch?v=gVoTzhzCqSQ)
+[![LocalVisionAI OCRデモ](Documents/Materials/YouTubeThumbnail_OfflineVisionAI.png)](https://www.linkedin.com/posts/tks-yoshinaga_localllms-ocr-computervision-activity-7506653758345560064-FxHq)
 
 [YouTubeでデモ動画を見る](https://www.youtube.com/watch?v=gVoTzhzCqSQ)
 
