@@ -11,6 +11,8 @@ Inference uses Google's [LiteRT-LM](https://github.com/google-ai-edge/LiteRT-LM)
 
 `ARFoundationApp` configures the camera through AR Foundation so that AR features can be added later. It does not currently place objects, anchors, or plane-detection results in AR space.
 
+> **Android only for now.** The LiteRT-LM integration relies on an Android-specific Kotlin bridge and Gradle setup, so iOS and desktop platforms are not supported.
+
 ## Demo video
 
 [![LocalVisionAI OCR demo](Documents/Materials/YouTubeThumbnail_OfflineVisionAI.png)](https://www.youtube.com/watch?v=gVoTzhzCqSQ)
@@ -158,6 +160,7 @@ Only `ImagePromptCoordinator` (for images) and `TextPromptCoordinator` (for text
 
 ## Limitations
 
+- Android only. iOS and desktop platforms are not supported.
 - Verified on a Pixel 7 (Android API 37) and a Samsung Galaxy S22. Other devices are untested.
 - Inference results are not streamed. Until completion, only the elapsed time and the long-running warning are shown.
 - The text sample keeps no conversation history, so you cannot ask follow-up questions that build on a previous one.

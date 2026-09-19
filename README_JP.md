@@ -11,6 +11,8 @@ Android端末のカメラで撮った写真の説明やテキスト入力によ�
 
 `ARFoundationApp`は、今後AR機能を組み込めるようにAR Foundationでカメラを構成したバージョンです。現時点ではAR空間にオブジェクト、アンカー、平面認識結果などを表示する機能は実装していません。
 
+> **現在はAndroidのみ対応しています。** LiteRT-LMとの連携をAndroid固有のKotlinブリッジとGradle設定で行っているため、iOSやデスクトップには対応していません。
+
 ## デモ動画
 
 [![LocalVisionAI OCRデモ](Documents/Materials/YouTubeThumbnail_OfflineVisionAI.png)](https://www.youtube.com/watch?v=gVoTzhzCqSQ)
@@ -161,6 +163,7 @@ UIの型を持つのは画像用の`ImagePromptCoordinator`とテキスト用の
 
 ## 制限事項
 
+- Androidのみ対応です。iOSやデスクトップには対応していません。
 - 実機はPixel 7 (Android API 37)およびSamsung Galaxy S22で確認しています。他機種は未検証です。
 - 推論結果はストリーミング表示しません。完了までは経過時間と長時間警告のみ表示します。
 - テキストサンプルは会話履歴を保持しないため、前の質問を前提にした続きの会話はできません。
