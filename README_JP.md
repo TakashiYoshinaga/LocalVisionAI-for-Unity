@@ -1,4 +1,4 @@
-# LocalVisionAI
+# LocalVisionAI for Unity
 
 *[English README](README.md)*
 
