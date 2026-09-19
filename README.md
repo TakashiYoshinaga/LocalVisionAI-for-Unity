@@ -50,7 +50,7 @@ Both projects use the following packages.
 | UniTask | Git URL | Async operations for Unity |
 | `com.yoshinaga.litertlmunity` | Local reference to `Packages/LiteRtLmUnity` | Model extraction and LiteRT-LM integration |
 
-`ARFoundationApp` additionally uses AR Foundation / ARCore 6.3.5. For registering and installing R3, ObservableCollections, and UniTask, see the [detailed R3 and UniTask installation guide](Documents/ExternalTools/R3_UniTask_Installation.md) (written in Japanese).
+`ARFoundationApp` additionally uses AR Foundation / ARCore 6.3.5. For registering and installing R3, ObservableCollections, and UniTask, see the [detailed R3 and UniTask installation guide](Documents/ExternalTools/R3_UniTask_Installation.md).
 
 The LiteRT-LM Android library is added automatically as a Gradle Maven dependency at build time, so no manual installation is needed.
 
