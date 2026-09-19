@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Takashi Yoshinaga
+
 using System;
 using System.IO;
 using System.Text.RegularExpressions;

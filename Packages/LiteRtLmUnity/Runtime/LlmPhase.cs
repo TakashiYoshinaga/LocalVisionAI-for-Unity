@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Takashi Yoshinaga
+
 namespace LiteRtLmUnity
 {
     public enum LlmPhase

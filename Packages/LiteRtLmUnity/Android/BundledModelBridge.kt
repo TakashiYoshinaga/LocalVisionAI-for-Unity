@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Takashi Yoshinaga
+
 package com.takashiyoshinaga.localvisionai
 
 import android.content.res.AssetManager
