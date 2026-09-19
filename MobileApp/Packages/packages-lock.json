@@ -311,6 +311,12 @@
       },
       "url": "https://packages.unity.com"
     },
+    "com.yoshinaga.litertlmunity": {
+      "version": "file:../../Packages/LiteRtLmUnity",
+      "depth": 0,
+      "source": "local",
+      "dependencies": {}
+    },
     "org.nuget.microsoft.bcl.asyncinterfaces": {
       "version": "6.0.0",
       "depth": 2,

@@ -19,5 +19,15 @@ namespace LiteRtLmUnity
 
         /// <summary>Part and sidecar path passed to the Android bridge.</summary>
         public const string AndroidAssetPath = StreamingAssetsFolder + "/" + FileName;
+
+        /// <summary>
+        /// This package's name, which is also the root of every asset path inside
+        /// it. Renaming the package in <c>package.json</c> means renaming it here.
+        /// </summary>
+        public const string PackageName = "com.yoshinaga.litertlmunity";
+
+        /// <summary>Asset path of the Kotlin bridge shipped with this package.</summary>
+        public const string KotlinPluginAssetPath =
+            "Packages/" + PackageName + "/Android/BundledModelBridge.kt";
     }
 }

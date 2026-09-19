@@ -41,7 +41,7 @@ namespace LiteRtLmUnity
         private const int CopyBufferSize = 1024 * 1024;
 
         private const string KotlinPluginPath =
-            "Assets/LiteRtLmUnity/Android/BundledModelBridge.kt";
+            BundledModelPaths.KotlinPluginAssetPath;
 
         public int callbackOrder => -1000;
 

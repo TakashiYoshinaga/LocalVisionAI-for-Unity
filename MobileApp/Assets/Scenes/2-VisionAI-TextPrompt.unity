@@ -1224,7 +1224,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 418e50d5f36b4476c9a86575a7721b7c, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LlmManager
+  m_EditorClassIdentifier: LiteRtLmUnity::LiteRtLmUnity.LlmManager
   _enableThinking: 0
   _thinkingTokenBudget: 256
   _answerTokenBudget: 512
@@ -2712,7 +2712,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f7b400c6995ec4a988b191bc0dfd82f0, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ShowResultManager
+  m_EditorClassIdentifier: LiteRtLmUnity::LiteRtLmUnity.ShowResultManager
 --- !u!4 &2026897822
 Transform:
   m_ObjectHideFlags: 0

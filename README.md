@@ -98,17 +98,27 @@ Hierarchyの`LLM Manager`が持つ`LlmManager`のInspectorから変更できま�
 
 ## 構成
 
+LLM部分は`Packages/LiteRtLmUnity`のUnityパッケージ（`com.yoshinaga.literalmunity`）に切り出してあります。`MobileApp`からはローカル参照で読み込んでいるので、他のプロジェクトへはこのフォルダを持っていくだけで再利用できます。
+
 ```text
-ImagePromptCoordinator 画像SceneのUIを所有し、各Managerを繋ぐ
-TextPromptCoordinator  テキスト専用SceneのUIと一問一答の送信を管理する
-LlmDataSource          R3によるイベントハブ
-ImageCaptureManager    ARカメラから静止画を取得しJPEGへ変換する
-LlmManager             モデル展開、エンジン初期化、推論を管理する
-ShowResultManager      進捗と結果を表示用の文字列へ整形する
-BundledModelBridge.kt  LiteRT-LMを呼ぶKotlin側の窓口
+Packages/LiteRtLmUnity/     再利用可能なLLM部分
+  Runtime/                  LiteRtLmUnityアセンブリ
+    LlmManager              モデル展開、エンジン初期化、推論を管理する
+    LlmDataSource           R3によるイベントハブ
+    ShowResultManager       進捗と結果を表示用の文字列へ整形する
+  Editor/                   LiteRtLmUnity.Editorアセンブリ
+    BundledModelBuildSetup  モデルを分割してStreamingAssetsへ配置する
+    LiteRtLmAndroidBuildSetup  生成されたGradleへLiteRT-LMの依存を追加する
+  Android/
+    BundledModelBridge.kt   LiteRT-LMを呼ぶKotlin側の窓口
+
+MobileApp/Assets/Scripts/   このサンプル固有の部分
+  ImagePromptCoordinator    画像SceneのUIを所有し、各Managerを繋ぐ
+  TextPromptCoordinator     テキスト専用SceneのUIと一問一答の送信を管理する
+  ImageCaptureManager       ARカメラから静止画を取得しJPEGへ変換する
 ```
 
-UIの型を持つのは画像用の`ImagePromptCoordinator`とテキスト用の`TextPromptCoordinator`だけです。各Managerはコールバックで値を報告するだけなので、UIの実装から独立しています。
+UIの型を持つのは画像用の`ImagePromptCoordinator`とテキスト用の`TextPromptCoordinator`だけです。各Managerはコールバックで値を報告するだけなので、UIの実装から独立しています。ARに依存する`ImageCaptureManager`はパッケージ側には入れず、サンプル側に置いています。
 
 ## 制限事項
 
