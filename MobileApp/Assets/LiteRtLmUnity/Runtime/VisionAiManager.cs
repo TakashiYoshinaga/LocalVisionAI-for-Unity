@@ -39,6 +39,7 @@ namespace LiteRtLmUnity
         private bool _modelSetupInProgress;
         private bool _engineInitializationInProgress;
         private bool _inferenceInProgress;
+        private InferenceKind _activeInferenceKind = InferenceKind.Image;
         private int _lastRequestId;
         private int _activeRequestId;
         private float _analysisStartedAt;
@@ -48,11 +49,6 @@ namespace LiteRtLmUnity
 
         public string PreparedModelPath { get; private set; }
         public bool IsReady { get; private set; }
-        public bool EnableThinking => _enableThinking;
-        public int ThinkingTokenBudget => _thinkingTokenBudget;
-        public int AnswerTokenBudget => _answerTokenBudget;
-        public string SystemPrompt => _systemPrompt;
-        public string UserPrompt => _userPrompt;
 
         public void SetUserPrompt(string prompt)
         {
@@ -97,46 +93,48 @@ namespace LiteRtLmUnity
 
             if (elapsedSeconds >= _analysisTimeoutSeconds)
             {
-                message = $"Analysis exceeded {_analysisTimeoutSeconds}s ({elapsedSeconds}s). Restart the app if it does not finish.";
+                message = _activeInferenceKind == InferenceKind.Text
+                    ? $"Response generation exceeded {_analysisTimeoutSeconds}s ({elapsedSeconds}s). Restart the app if it does not finish."
+                    : $"Analysis exceeded {_analysisTimeoutSeconds}s ({elapsedSeconds}s). Restart the app if it does not finish.";
 
                 if (!_analysisTimeoutLogged)
                 {
                     _analysisTimeoutLogged = true;
+                    string operation = _activeInferenceKind == InferenceKind.Text
+                        ? "Text generation"
+                        : "Image analysis";
                     Debug.LogError(
-                        $"Image analysis request {_activeRequestId} exceeded the " +
+                        $"{operation} request {_activeRequestId} exceeded the " +
                         $"{_analysisTimeoutSeconds}s time limit. The native call is still running.");
                 }
             }
             else if (elapsedSeconds >= _slowAnalysisWarningSeconds)
             {
-                message = $"Still analyzing... {elapsedSeconds}s";
+                message = _activeInferenceKind == InferenceKind.Text
+                    ? $"Still generating... {elapsedSeconds}s"
+                    : $"Still analyzing... {elapsedSeconds}s";
 
                 if (!_slowAnalysisWarningLogged)
                 {
                     _slowAnalysisWarningLogged = true;
+                    string operation = _activeInferenceKind == InferenceKind.Text
+                        ? "Text generation"
+                        : "Image analysis";
                     Debug.LogWarning(
-                        $"Image analysis request {_activeRequestId} is still running " +
+                        $"{operation} request {_activeRequestId} is still running " +
                         $"after {_slowAnalysisWarningSeconds}s.");
                 }
             }
             else
             {
-                message = $"Analyzing image... {elapsedSeconds}s";
+                message = _activeInferenceKind == InferenceKind.Text
+                    ? $"Generating response... {elapsedSeconds}s"
+                    : $"Analyzing image... {elapsedSeconds}s";
             }
 
             _dataSource.PublishProgress(new VisionAiProgressReport(
                 VisionAiPhase.Inferencing,
                 message));
-        }
-
-        /// <summary>
-        /// Changes the thinking settings used by the next inference. The engine is
-        /// never reloaded: the values are read when a request starts.
-        /// </summary>
-        public void SetThinkingConfig(bool enabled, int tokenBudget)
-        {
-            _enableThinking = enabled;
-            _thinkingTokenBudget = Mathf.Max(0, tokenBudget);
         }
 
         public void RetryModelSetup()
@@ -286,6 +284,7 @@ namespace LiteRtLmUnity
 
     #if UNITY_ANDROID && !UNITY_EDITOR
             _inferenceInProgress = true;
+            _activeInferenceKind = InferenceKind.Image;
             _activeRequestId = ++_lastRequestId;
             BeginAnalysisTracking();
             _dataSource.PublishProgress(new VisionAiProgressReport(
@@ -333,6 +332,76 @@ namespace LiteRtLmUnity
             }
     #else
             PublishError("Image analysis requires an Android device.");
+    #endif
+        }
+
+        /// <summary>
+        /// Runs one text-only request. The System Prompt belongs to this manager;
+        /// callers provide only the per-request User Prompt.
+        /// </summary>
+        public void AnalyzeText(string userPrompt)
+        {
+            if (_dataSource == null)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(_systemPrompt))
+            {
+                PublishError("The System Prompt is not configured.");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(userPrompt))
+            {
+                PublishError("Enter a User Prompt before sending.");
+                return;
+            }
+
+            if (!IsReady)
+            {
+                PublishError("The AI engine is not ready yet.");
+                return;
+            }
+
+            if (_inferenceInProgress)
+            {
+                return;
+            }
+
+    #if UNITY_ANDROID && !UNITY_EDITOR
+            _inferenceInProgress = true;
+            _activeInferenceKind = InferenceKind.Text;
+            _activeRequestId = ++_lastRequestId;
+            BeginAnalysisTracking();
+            _dataSource.PublishProgress(new VisionAiProgressReport(
+                VisionAiPhase.Inferencing,
+                "Generating response... 0s"));
+
+            try
+            {
+                using AndroidJavaClass bridge = new(AndroidBridgeClass);
+
+                // Keep these values in the same order as
+                // BundledModelBridge.analyzeText in BundledModelBridge.kt.
+                bridge.CallStatic(
+                    "analyzeText",
+                    gameObject.name,
+                    _activeRequestId,
+                    _systemPrompt,
+                    userPrompt,
+                    _enableThinking,
+                    _thinkingTokenBudget,
+                    _answerTokenBudget);
+            }
+            catch (Exception exception)
+            {
+                _inferenceInProgress = false;
+                EndAnalysisTracking();
+                PublishError($"Could not start text generation: {exception.Message}");
+            }
+    #else
+            PublishError("Text generation requires an Android device.");
     #endif
         }
 
@@ -460,8 +529,11 @@ namespace LiteRtLmUnity
             _slowAnalysisWarningLogged = false;
             _analysisTimeoutLogged = false;
 
+            string operation = _activeInferenceKind == InferenceKind.Text
+                ? "Text generation"
+                : "Image analysis";
             Debug.Log(
-                $"Image analysis request {_activeRequestId} started " +
+                $"{operation} request {_activeRequestId} started " +
                 $"(thinking={_enableThinking}, thinkingTokens={_thinkingTokenBudget}, " +
                 $"answerTokens={_answerTokenBudget}).");
         }
@@ -492,6 +564,12 @@ namespace LiteRtLmUnity
             public bool ready;
             public bool retryable;
             public string modelPath;
+        }
+
+        private enum InferenceKind
+        {
+            Image,
+            Text
         }
     }
 }

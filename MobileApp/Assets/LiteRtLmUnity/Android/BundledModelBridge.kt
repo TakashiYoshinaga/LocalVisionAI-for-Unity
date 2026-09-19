@@ -192,6 +192,71 @@ object BundledModelBridge {
     }
 
     @JvmStatic
+    fun analyzeText(
+        callbackGameObject: String,
+        requestId: Int,
+        systemPrompt: String,
+        userPrompt: String,
+        enableThinking: Boolean,
+        thinkingTokenBudget: Int,
+        answerTokenBudget: Int
+    ) {
+        if (systemPrompt.isBlank()) {
+            sendAnalysis(
+                callbackGameObject,
+                requestId,
+                "Error",
+                "The System Prompt is not configured."
+            )
+            return
+        }
+
+        if (userPrompt.isBlank()) {
+            sendAnalysis(
+                callbackGameObject,
+                requestId,
+                "Error",
+                "Enter a User Prompt before sending."
+            )
+            return
+        }
+
+        if (!isAnalyzing.compareAndSet(false, true)) {
+            sendAnalysis(
+                callbackGameObject,
+                requestId,
+                "Error",
+                "Text generation is already running."
+            )
+            return
+        }
+
+        executor.execute {
+            try {
+                runTextAnalysis(
+                    callbackGameObject,
+                    requestId,
+                    systemPrompt,
+                    userPrompt,
+                    enableThinking,
+                    thinkingTokenBudget,
+                    answerTokenBudget
+                )
+            } catch (throwable: Throwable) {
+                Log.e(LOG_TAG, "Text generation failed.", throwable)
+                sendAnalysis(
+                    callbackGameObject,
+                    requestId,
+                    "Error",
+                    "Could not generate a response: ${safeMessage(throwable)}"
+                )
+            } finally {
+                isAnalyzing.set(false)
+            }
+        }
+    }
+
+    @JvmStatic
     fun shutdown() {
         shutdownRequested.set(true)
         executor.execute {
@@ -338,6 +403,73 @@ object BundledModelBridge {
             String.format(
                 Locale.US,
                 "Image analysis finished in %.1f s (%d characters).",
+                (SystemClock.elapsedRealtime() - startedAt) / 1000.0,
+                answer.length
+            )
+        )
+
+        if (answer.isBlank()) {
+            throw IllegalStateException("The AI model returned an empty answer.")
+        }
+
+        sendAnalysis(
+            callbackGameObject,
+            requestId,
+            "Ready",
+            "AI Ready",
+            answer
+        )
+    }
+
+    private fun runTextAnalysis(
+        callbackGameObject: String,
+        requestId: Int,
+        systemPrompt: String,
+        userPrompt: String,
+        enableThinking: Boolean,
+        thinkingTokenBudget: Int,
+        answerTokenBudget: Int
+    ) {
+        require(systemPrompt.isNotBlank()) { "The System Prompt is not configured." }
+        require(userPrompt.isNotBlank()) { "The User Prompt is empty." }
+
+        val activeEngine = synchronized(engineLock) { engine }
+        if (activeEngine == null || !activeEngine.isInitialized()) {
+            throw IllegalStateException("The AI engine is not ready.")
+        }
+
+        sendAnalysis(
+            callbackGameObject,
+            requestId,
+            "Inferencing",
+            "Generating response..."
+        )
+
+        val config = ConversationConfig(
+            systemInstruction = Contents.of(systemPrompt),
+            channels = if (enableThinking) listOf(thinkingChannel) else emptyList(),
+            maxOutputToken = if (answerTokenBudget > 0) answerTokenBudget else null,
+            thinkingConfig = ThinkingConfig(enableThinking, thinkingTokenBudget)
+        )
+        val startedAt = SystemClock.elapsedRealtime()
+
+        // A new conversation is created for every send. This sample is
+        // intentionally one-shot and never carries context between requests.
+        val answer = activeEngine.createConversation(config).use { conversation ->
+            extractText(
+                conversation.sendMessage(Contents.of(Content.Text(userPrompt)))
+            )
+        }
+
+        if (shutdownRequested.get()) {
+            return
+        }
+
+        Log.i(
+            LOG_TAG,
+            String.format(
+                Locale.US,
+                "Text generation finished in %.1f s (%d characters).",
                 (SystemClock.elapsedRealtime() - startedAt) / 1000.0,
                 answer.length
             )
