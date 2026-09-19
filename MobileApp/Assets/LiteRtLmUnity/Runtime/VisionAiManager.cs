@@ -30,6 +30,11 @@ namespace LiteRtLmUnity
         [Header("Prompt")]
         [SerializeField, TextArea(3, 10)] private string _systemPrompt = "";
         [SerializeField, TextArea(3, 10)] private string _userPrompt = "";
+        // Last resort for image analysis only: used when the System Prompt and
+        // the User Prompt are BOTH blank. A System Prompt on its own is a valid
+        // setup (see 0-VisionAI-SystemPromptOnly), so a blank User Prompt alone
+        // never reaches this value.
+        [Tooltip("Used only when the System Prompt and the User Prompt are both empty.")]
         [SerializeField, TextArea(2, 5)] private string _fallbackImagePrompt =
             "Describe what is visible in this image clearly and concisely.";
 
@@ -268,6 +273,14 @@ namespace LiteRtLmUnity
         {
             if (request == null || _dataSource == null)
             {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(_systemPrompt) &&
+                string.IsNullOrWhiteSpace(_userPrompt) &&
+                string.IsNullOrWhiteSpace(_fallbackImagePrompt))
+            {
+                PublishError("No prompt is configured for image analysis.");
                 return;
             }
 
