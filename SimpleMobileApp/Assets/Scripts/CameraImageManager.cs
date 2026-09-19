@@ -143,16 +143,16 @@ public sealed class CameraImageManager : MonoBehaviour
                 switch (clockwiseRotation)
                 {
                     case 90:
-                        targetX = sourceHeight - 1 - sourceY;
-                        targetY = sourceX;
+                        targetX = sourceY;
+                        targetY = sourceWidth - 1 - sourceX;
                         break;
                     case 180:
                         targetX = sourceWidth - 1 - sourceX;
                         targetY = sourceHeight - 1 - sourceY;
                         break;
                     case 270:
-                        targetX = sourceY;
-                        targetY = sourceWidth - 1 - sourceX;
+                        targetX = sourceHeight - 1 - sourceY;
+                        targetY = sourceX;
                         break;
                     default:
                         targetX = sourceX;
