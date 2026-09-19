@@ -1,9 +1,6 @@
 using System;
 using LiteRtLmUnity;
-using Unity.Collections;
 using UnityEngine;
-using UnityEngine.XR.ARFoundation;
-using UnityEngine.XR.ARSubsystems;
 using R3;
 
 public class ImageCaptureManager : MonoBehaviour
@@ -11,7 +8,7 @@ public class ImageCaptureManager : MonoBehaviour
     private const int MaxImageDimension = 1024;
     private const int JpegQuality = 85;
 
-    [SerializeField] private ARCameraManager _cameraManager;
+    [SerializeField] private CameraImageManager _cameraImageManager;
 
     private LlmDataSource _dataSource;
     private Action<bool> _onCaptureAvailabilityChanged;
@@ -32,7 +29,13 @@ public class ImageCaptureManager : MonoBehaviour
         _dataSource = llmDataSource;
         _onCaptureAvailabilityChanged = onCaptureAvailabilityChanged;
 
-        _onCaptureAvailabilityChanged?.Invoke(false);
+        if (_cameraImageManager != null)
+        {
+            _cameraImageManager.AvailabilityChanged -= OnCameraAvailabilityChanged;
+            _cameraImageManager.AvailabilityChanged += OnCameraAvailabilityChanged;
+        }
+
+        NotifyCaptureAvailability();
         _progressSubscription?.Dispose();
         _progressSubscription = _dataSource.ProgressReports
             .ObserveOnMainThread()
@@ -47,27 +50,18 @@ public class ImageCaptureManager : MonoBehaviour
             return;
         }
 
-#if UNITY_ANDROID && !UNITY_EDITOR
-        if (!UnityEngine.Android.Permission.HasUserAuthorizedPermission(
-                UnityEngine.Android.Permission.Camera))
-        {
-            PublishError("Camera permission is required.");
-            return;
-        }
-#endif
-
         if (_captureInProgress)
         {
             return;
         }
 
-        if (_cameraManager == null)
+        if (_cameraImageManager == null)
         {
-            PublishError("AR Camera Manager is not configured.");
+            PublishError("Camera Image Manager is not configured.");
             return;
         }
 
-        if (!_cameraManager.TryAcquireLatestCpuImage(out XRCpuImage cpuImage))
+        if (!_cameraImageManager.TryCaptureFrame(out Texture2D cameraFrame))
         {
             PublishError("Camera image is not available yet. Try again.");
             return;
@@ -79,42 +73,27 @@ public class ImageCaptureManager : MonoBehaviour
             LlmPhase.Capturing,
             "Capturing camera image..."));
 
-        NativeArray<byte> convertedData = default;
-        Texture2D convertedTexture = null;
-        Texture2D orientedTexture = null;
+        Texture2D resizedTexture = null;
 
         try
         {
             Vector2Int outputDimensions = GetScaledDimensions(
-                cpuImage.width,
-                cpuImage.height);
-            var conversionParams = new XRCpuImage.ConversionParams
+                cameraFrame.width,
+                cameraFrame.height);
+            Texture2D requestTexture = cameraFrame;
+
+            if (outputDimensions.x != cameraFrame.width ||
+                outputDimensions.y != cameraFrame.height)
             {
-                inputRect = new RectInt(0, 0, cpuImage.width, cpuImage.height),
-                outputDimensions = outputDimensions,
-                outputFormat = TextureFormat.RGBA32,
-                transformation = XRCpuImage.Transformation.MirrorY
-            };
+                resizedTexture = ResizeTexture(cameraFrame, outputDimensions);
+                requestTexture = resizedTexture;
+            }
 
-            convertedData = new NativeArray<byte>(
-                cpuImage.GetConvertedDataSize(conversionParams),
-                Allocator.Temp);
-            cpuImage.Convert(conversionParams, convertedData);
-
-            convertedTexture = new Texture2D(
-                outputDimensions.x,
-                outputDimensions.y,
-                TextureFormat.RGBA32,
-                false);
-            convertedTexture.LoadRawTextureData(convertedData);
-            convertedTexture.Apply(false, false);
-
-            orientedTexture = ApplyScreenOrientation(convertedTexture);
-            byte[] jpegData = orientedTexture.EncodeToJPG(JpegQuality);
+            byte[] jpegData = requestTexture.EncodeToJPG(JpegQuality);
             var request = new ImageRequest(
                 jpegData,
-                orientedTexture.width,
-                orientedTexture.height);
+                requestTexture.width,
+                requestTexture.height);
 
             // ImageRequests is marshalled to the next main-thread frame. Lock
             // capture immediately so the button cannot briefly re-enable.
@@ -127,21 +106,14 @@ public class ImageCaptureManager : MonoBehaviour
         }
         finally
         {
-            cpuImage.Dispose();
-
-            if (convertedData.IsCreated)
+            if (resizedTexture != null)
             {
-                convertedData.Dispose();
+                Destroy(resizedTexture);
             }
 
-            if (orientedTexture != null && orientedTexture != convertedTexture)
+            if (cameraFrame != null)
             {
-                Destroy(orientedTexture);
-            }
-
-            if (convertedTexture != null)
-            {
-                Destroy(convertedTexture);
+                Destroy(cameraFrame);
             }
 
             _captureInProgress = false;
@@ -180,7 +152,9 @@ public class ImageCaptureManager : MonoBehaviour
             return;
         }
 
-        _onCaptureAvailabilityChanged?.Invoke(_aiReady && !_inferenceInProgress);
+        bool cameraReady = _cameraImageManager != null && _cameraImageManager.IsReady;
+        _onCaptureAvailabilityChanged?.Invoke(
+            _aiReady && cameraReady && !_inferenceInProgress);
     }
 
     private static Vector2Int GetScaledDimensions(int width, int height)
@@ -198,63 +172,43 @@ public class ImageCaptureManager : MonoBehaviour
             Mathf.Max(1, Mathf.RoundToInt(height * scale)));
     }
 
-    private static Texture2D ApplyScreenOrientation(Texture2D source)
+    private static Texture2D ResizeTexture(Texture2D source, Vector2Int dimensions)
     {
-        return Screen.orientation switch
+        RenderTexture temporary = RenderTexture.GetTemporary(
+            dimensions.x,
+            dimensions.y,
+            0,
+            RenderTextureFormat.ARGB32,
+            RenderTextureReadWrite.Linear);
+        RenderTexture previous = RenderTexture.active;
+
+        try
         {
-            ScreenOrientation.Portrait => RotateTexture(source, 90),
-            ScreenOrientation.PortraitUpsideDown => RotateTexture(source, -90),
-            ScreenOrientation.LandscapeRight => RotateTexture(source, 180),
-            _ => source
-        };
+            Graphics.Blit(source, temporary);
+            RenderTexture.active = temporary;
+            var resized = new Texture2D(
+                dimensions.x,
+                dimensions.y,
+                TextureFormat.RGBA32,
+                false);
+            resized.ReadPixels(
+                new Rect(0, 0, dimensions.x, dimensions.y),
+                0,
+                0,
+                false);
+            resized.Apply(false, false);
+            return resized;
+        }
+        finally
+        {
+            RenderTexture.active = previous;
+            RenderTexture.ReleaseTemporary(temporary);
+        }
     }
 
-    private static Texture2D RotateTexture(Texture2D source, int clockwiseDegrees)
+    private void OnCameraAvailabilityChanged(bool _)
     {
-        Color32[] sourcePixels = source.GetPixels32();
-        int sourceWidth = source.width;
-        int sourceHeight = source.height;
-        bool quarterTurn = clockwiseDegrees == 90 || clockwiseDegrees == -90;
-        int targetWidth = quarterTurn ? sourceHeight : sourceWidth;
-        int targetHeight = quarterTurn ? sourceWidth : sourceHeight;
-        var targetPixels = new Color32[sourcePixels.Length];
-
-        for (int y = 0; y < sourceHeight; y++)
-        {
-            for (int x = 0; x < sourceWidth; x++)
-            {
-                int targetX;
-                int targetY;
-
-                if (clockwiseDegrees == 90)
-                {
-                    targetX = sourceHeight - 1 - y;
-                    targetY = x;
-                }
-                else if (clockwiseDegrees == -90)
-                {
-                    targetX = y;
-                    targetY = sourceWidth - 1 - x;
-                }
-                else
-                {
-                    targetX = sourceWidth - 1 - x;
-                    targetY = sourceHeight - 1 - y;
-                }
-
-                targetPixels[targetY * targetWidth + targetX] =
-                    sourcePixels[y * sourceWidth + x];
-            }
-        }
-
-        var target = new Texture2D(
-            targetWidth,
-            targetHeight,
-            TextureFormat.RGBA32,
-            false);
-        target.SetPixels32(targetPixels);
-        target.Apply(false, false);
-        return target;
+        NotifyCaptureAvailability();
     }
 
     private void PublishError(string message)
@@ -266,6 +220,11 @@ public class ImageCaptureManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (_cameraImageManager != null)
+        {
+            _cameraImageManager.AvailabilityChanged -= OnCameraAvailabilityChanged;
+        }
+
         _progressSubscription?.Dispose();
     }
 }
