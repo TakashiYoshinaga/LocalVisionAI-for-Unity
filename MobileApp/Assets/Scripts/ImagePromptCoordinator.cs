@@ -2,18 +2,18 @@ using LiteRtLmUnity;
 using UnityEngine;
 
 /// <summary>
-/// Owns the Scene's UI and the shared <see cref="VisionAiDataSource"/>. The
+/// Owns the Scene's UI and the shared <see cref="LlmDataSource"/>. The
 /// managers stay free of UI types: this class forwards button clicks to them
 /// and applies the values they report back.
 /// </summary>
-public class MainCoordinator : MonoBehaviour
+public class ImagePromptCoordinator : MonoBehaviour
 {
     private const string CaptureLabel = "Search";
     private const string RetryLabel = "Retry Setup";
 
     [Header("Logic Managers")]
     [SerializeField] private ImageCaptureManager _imageCaptureManager;
-    [SerializeField] private VisionAiManager _visionAiManager;
+    [SerializeField] private LlmManager _llmManager;
     [SerializeField] private ShowResultManager _showResultManager;
     [Header("UI Elements")]
     [SerializeField] private TMPro.TMP_Text _resultText;
@@ -24,7 +24,7 @@ public class MainCoordinator : MonoBehaviour
     [SerializeField] private UnityEngine.UI.ScrollRect _resultScrollRect;
     [SerializeField] private GameObject _resultPanel;
 
-    private readonly VisionAiDataSource _visionAiDataSource = new();
+    private readonly LlmDataSource _llmDataSource = new();
 
     private TMPro.TMP_Text _captureButtonLabel;
     private bool _captureAvailable;
@@ -36,26 +36,26 @@ public class MainCoordinator : MonoBehaviour
 
         // The display subscribes first so that it also shows whatever the
         // other managers report while they start up.
-        _showResultManager.Initialize(_visionAiDataSource, SetStatusText, SetResultText);
-        _imageCaptureManager.Initialize(_visionAiDataSource, SetCaptureAvailable);
-        _visionAiManager.Initialize(_visionAiDataSource, SetRetryAvailable);
+        _showResultManager.Initialize(_llmDataSource, SetStatusText, SetResultText);
+        _imageCaptureManager.Initialize(_llmDataSource, SetCaptureAvailable);
+        _llmManager.Initialize(_llmDataSource, SetRetryAvailable);
     }
 
     private void InitializeUI()
     {
         if (_resultText == null)
         {
-            Debug.LogError("MainCoordinator: the result text is not assigned.");
+            Debug.LogError("ImagePromptCoordinator: the result text is not assigned.");
         }
 
         if (_statusText == null)
         {
-            Debug.LogError("MainCoordinator: the status text is not assigned.");
+            Debug.LogError("ImagePromptCoordinator: the status text is not assigned.");
         }
 
         if (_captureButton == null)
         {
-            Debug.LogError("MainCoordinator: the Analyze Camera button is not assigned.");
+            Debug.LogError("ImagePromptCoordinator: the Analyze Camera button is not assigned.");
         }
         else
         {
@@ -66,17 +66,17 @@ public class MainCoordinator : MonoBehaviour
 
         if (_userPromptInputField == null)
         {
-            Debug.LogError("MainCoordinator: the user prompt input is not assigned.");
+            Debug.LogError("ImagePromptCoordinator: the user prompt input is not assigned.");
         }
 
         if (_resultScrollRect == null)
         {
-            Debug.LogError("MainCoordinator: the result scroll view is not assigned.");
+            Debug.LogError("ImagePromptCoordinator: the result scroll view is not assigned.");
         }
 
         if (_resultPanel == null)
         {
-            Debug.LogError("MainCoordinator: the result panel is not assigned.");
+            Debug.LogError("ImagePromptCoordinator: the result panel is not assigned.");
         }
         else
         {
@@ -85,7 +85,7 @@ public class MainCoordinator : MonoBehaviour
 
         if (_closeResultButton == null)
         {
-            Debug.LogError("MainCoordinator: the close result button is not assigned.");
+            Debug.LogError("ImagePromptCoordinator: the close result button is not assigned.");
         }
         else
         {
@@ -101,7 +101,7 @@ public class MainCoordinator : MonoBehaviour
     {
         if (_retryAvailable)
         {
-            _visionAiManager.RetryModelSetup();
+            _llmManager.RetryModelSetup();
             return;
         }
 
@@ -109,7 +109,7 @@ public class MainCoordinator : MonoBehaviour
         // camera view is never left sharing the screen with a stale result.
         SetResultText(string.Empty);
 
-        _visionAiManager.SetUserPrompt(_userPromptInputField != null
+        _llmManager.SetUserPrompt(_userPromptInputField != null
             ? _userPromptInputField.text
             : string.Empty);
         _imageCaptureManager.CaptureCameraImage();
@@ -186,7 +186,7 @@ public class MainCoordinator : MonoBehaviour
             _closeResultButton.onClick.RemoveListener(OnCloseResultButtonClicked);
         }
 
-        _visionAiManager.Shutdown();
-        _visionAiDataSource.Dispose();
+        _llmManager.Shutdown();
+        _llmDataSource.Dispose();
     }
 }

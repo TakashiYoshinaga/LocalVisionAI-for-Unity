@@ -15,7 +15,7 @@ namespace LiteRtLmUnity
         /// owns the UI, so this class never touches a UI type.
         /// </summary>
         public void Initialize(
-            VisionAiDataSource visionAiDataSource,
+            LlmDataSource llmDataSource,
             Action<string> onStatusTextChanged,
             Action<string> onResultTextChanged)
         {
@@ -28,10 +28,10 @@ namespace LiteRtLmUnity
                 return;
             }
 
-            _progressSubscription = visionAiDataSource.ProgressReports
+            _progressSubscription = llmDataSource.ProgressReports
                 .ObserveOnMainThread()
                 .Subscribe(report => onStatusTextChanged(FormatProgress(report)));
-            _resultSubscription = visionAiDataSource.ResultText
+            _resultSubscription = llmDataSource.ResultText
                 .ObserveOnMainThread()
                 .Subscribe(result => onResultTextChanged(ToDisplayText(result)));
         }
@@ -77,7 +77,7 @@ namespace LiteRtLmUnity
                 .TrimEnd('\n');
         }
 
-        private static string FormatProgress(VisionAiProgressReport report)
+        private static string FormatProgress(LlmProgressReport report)
         {
             return report.Progress01.HasValue
                 ? $"{report.Message} {report.Progress01.Value:P0}"

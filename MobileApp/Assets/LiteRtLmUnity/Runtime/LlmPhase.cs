@@ -1,6 +1,6 @@
 namespace LiteRtLmUnity
 {
-    public enum VisionAiPhase
+    public enum LlmPhase
     {
         ExtractingModel,
         Initializing,

@@ -13,7 +13,7 @@ public sealed class TextPromptCoordinator : MonoBehaviour
     private const string RetryLabel = "Retry Setup";
 
     [Header("Logic Managers")]
-    [SerializeField] private VisionAiManager _visionAiManager;
+    [SerializeField] private LlmManager _llmManager;
     [SerializeField] private ShowResultManager _showResultManager;
 
     [Header("UI Elements")]
@@ -25,7 +25,7 @@ public sealed class TextPromptCoordinator : MonoBehaviour
     [SerializeField] private UnityEngine.UI.ScrollRect _resultScrollRect;
     [SerializeField] private GameObject _resultPanel;
 
-    private readonly VisionAiDataSource _visionAiDataSource = new();
+    private readonly LlmDataSource _llmDataSource = new();
 
     private IDisposable _progressSubscription;
     private TMPro.TMP_Text _sendButtonLabel;
@@ -40,14 +40,14 @@ public sealed class TextPromptCoordinator : MonoBehaviour
         // Subscribe before the AI manager starts setup so the initial state is
         // reflected in the button as well as in the status label.
         _showResultManager.Initialize(
-            _visionAiDataSource,
+            _llmDataSource,
             SetStatusText,
             SetResultText);
-        _progressSubscription = _visionAiDataSource.ProgressReports
+        _progressSubscription = _llmDataSource.ProgressReports
             .ObserveOnMainThread()
             .Subscribe(OnProgressReported);
-        _visionAiManager.Initialize(
-            _visionAiDataSource,
+        _llmManager.Initialize(
+            _llmDataSource,
             SetRetryAvailable);
     }
 
@@ -111,7 +111,7 @@ public sealed class TextPromptCoordinator : MonoBehaviour
     {
         if (_retryAvailable)
         {
-            _visionAiManager.RetryModelSetup();
+            _llmManager.RetryModelSetup();
             return;
         }
 
@@ -125,7 +125,7 @@ public sealed class TextPromptCoordinator : MonoBehaviour
         }
 
         SetResultText(string.Empty);
-        _visionAiManager.AnalyzeText(userPrompt);
+        _llmManager.AnalyzeText(userPrompt);
     }
 
     private void OnUserPromptChanged(string _)
@@ -133,31 +133,31 @@ public sealed class TextPromptCoordinator : MonoBehaviour
         ApplyButtonState();
     }
 
-    private void OnProgressReported(VisionAiProgressReport report)
+    private void OnProgressReported(LlmProgressReport report)
     {
         switch (report.Phase)
         {
-            case VisionAiPhase.Ready:
+            case LlmPhase.Ready:
                 _engineReady = true;
                 _inferenceInProgress = false;
                 break;
 
-            case VisionAiPhase.Inferencing:
+            case LlmPhase.Inferencing:
                 _inferenceInProgress = true;
                 break;
 
-            case VisionAiPhase.ExtractingModel:
-            case VisionAiPhase.Initializing:
+            case LlmPhase.ExtractingModel:
+            case LlmPhase.Initializing:
                 _engineReady = false;
                 _inferenceInProgress = false;
                 break;
 
-            case VisionAiPhase.Error:
-                _engineReady = _visionAiManager != null && _visionAiManager.IsReady;
+            case LlmPhase.Error:
+                _engineReady = _llmManager != null && _llmManager.IsReady;
                 _inferenceInProgress = false;
                 break;
 
-            case VisionAiPhase.Capturing:
+            case LlmPhase.Capturing:
                 break;
 
             default:
@@ -245,7 +245,7 @@ public sealed class TextPromptCoordinator : MonoBehaviour
         }
 
         _progressSubscription?.Dispose();
-        _visionAiManager?.Shutdown();
-        _visionAiDataSource.Dispose();
+        _llmManager?.Shutdown();
+        _llmDataSource.Dispose();
     }
 }

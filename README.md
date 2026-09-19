@@ -77,7 +77,7 @@ APKは2.6GB前後になります。
 
 展開が終わるとAIエンジンが初期化され、`AI Ready`と表示されたら画像シーンでは`Search`、テキストシーンでは入力後に`Send`が押せるようになります。
 
-テキストシーンのSystem Promptは`VisionAiManager`に固定値として設定されています。
+テキストシーンのSystem Promptは`LlmManager`に固定値として設定されています。
 
 ```text
 You are a helpful assistant. Answer clearly and concisely.
@@ -85,7 +85,7 @@ You are a helpful assistant. Answer clearly and concisely.
 
 ## 設定
 
-Hierarchyの`VisionAiManager`のInspectorから変更できます。
+Hierarchyの`LLM Manager`が持つ`LlmManager`のInspectorから変更できます。
 
 | 項目 | 既定値 | 説明 |
 |---|---|---|
@@ -99,16 +99,16 @@ Hierarchyの`VisionAiManager`のInspectorから変更できます。
 ## 構成
 
 ```text
-MainCoordinator        Scene上のUIを所有し、各Managerを繋ぐ
+ImagePromptCoordinator 画像SceneのUIを所有し、各Managerを繋ぐ
 TextPromptCoordinator  テキスト専用SceneのUIと一問一答の送信を管理する
-VisionAiDataSource     R3によるイベントハブ
+LlmDataSource          R3によるイベントハブ
 ImageCaptureManager    ARカメラから静止画を取得しJPEGへ変換する
-VisionAiManager        モデル展開、エンジン初期化、推論を管理する
+LlmManager             モデル展開、エンジン初期化、推論を管理する
 ShowResultManager      進捗と結果を表示用の文字列へ整形する
 BundledModelBridge.kt  LiteRT-LMを呼ぶKotlin側の窓口
 ```
 
-UIの型を持つのは画像用の`MainCoordinator`とテキスト用の`TextPromptCoordinator`だけです。各Managerはコールバックで値を報告するだけなので、UIの実装から独立しています。
+UIの型を持つのは画像用の`ImagePromptCoordinator`とテキスト用の`TextPromptCoordinator`だけです。各Managerはコールバックで値を報告するだけなので、UIの実装から独立しています。
 
 ## 制限事項
 

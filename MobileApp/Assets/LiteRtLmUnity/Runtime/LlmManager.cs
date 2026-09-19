@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace LiteRtLmUnity
 {
-    public class VisionAiManager : MonoBehaviour
+    public class LlmManager : MonoBehaviour
     {
         private const string AndroidBridgeClass =
             "com.takashiyoshinaga.localvisionai.BundledModelBridge";
@@ -38,7 +38,7 @@ namespace LiteRtLmUnity
         [SerializeField, TextArea(2, 5)] private string _fallbackImagePrompt =
             "Describe what is visible in this image clearly and concisely.";
 
-        private VisionAiDataSource _dataSource;
+        private LlmDataSource _dataSource;
         private Action<bool> _onRetryAvailabilityChanged;
         private IDisposable _imageRequestSubscription;
         private bool _modelSetupInProgress;
@@ -65,10 +65,10 @@ namespace LiteRtLmUnity
         /// <paramref name="onRetryAvailabilityChanged"/>. The caller owns the UI.
         /// </summary>
         public void Initialize(
-            VisionAiDataSource visionAiDataSource,
+            LlmDataSource llmDataSource,
             Action<bool> onRetryAvailabilityChanged)
         {
-            _dataSource = visionAiDataSource;
+            _dataSource = llmDataSource;
             _onRetryAvailabilityChanged = onRetryAvailabilityChanged;
             _onRetryAvailabilityChanged?.Invoke(false);
             _imageRequestSubscription?.Dispose();
@@ -137,8 +137,8 @@ namespace LiteRtLmUnity
                     : $"Analyzing image... {elapsedSeconds}s";
             }
 
-            _dataSource.PublishProgress(new VisionAiProgressReport(
-                VisionAiPhase.Inferencing,
+            _dataSource.PublishProgress(new LlmProgressReport(
+                LlmPhase.Inferencing,
                 message));
         }
 
@@ -154,8 +154,8 @@ namespace LiteRtLmUnity
     #if UNITY_ANDROID && !UNITY_EDITOR
             _modelSetupInProgress = true;
             _onRetryAvailabilityChanged?.Invoke(false);
-            _dataSource.PublishProgress(new VisionAiProgressReport(
-                VisionAiPhase.ExtractingModel,
+            _dataSource.PublishProgress(new LlmProgressReport(
+                LlmPhase.ExtractingModel,
                 "Preparing bundled AI model...",
                 0f));
 
@@ -194,7 +194,7 @@ namespace LiteRtLmUnity
             }
 
             if (callback == null ||
-                !Enum.TryParse(callback.phase, out VisionAiPhase phase))
+                !Enum.TryParse(callback.phase, out LlmPhase phase))
             {
                 _modelSetupInProgress = false;
                 PublishError("Invalid model setup response.");
@@ -205,7 +205,7 @@ namespace LiteRtLmUnity
                 ? callback.progress01
                 : null;
 
-            _dataSource?.PublishProgress(new VisionAiProgressReport(
+            _dataSource?.PublishProgress(new LlmProgressReport(
                 phase,
                 callback.message,
                 progress));
@@ -217,7 +217,7 @@ namespace LiteRtLmUnity
                 _onRetryAvailabilityChanged?.Invoke(false);
                 StartEngineInitialization();
             }
-            else if (phase == VisionAiPhase.Error)
+            else if (phase == LlmPhase.Error)
             {
                 _modelSetupInProgress = false;
                 _onRetryAvailabilityChanged?.Invoke(callback.retryable);
@@ -244,24 +244,24 @@ namespace LiteRtLmUnity
             }
 
             if (callback == null ||
-                !Enum.TryParse(callback.phase, out VisionAiPhase phase))
+                !Enum.TryParse(callback.phase, out LlmPhase phase))
             {
                 _engineInitializationInProgress = false;
                 PublishError("Invalid engine response.");
                 return;
             }
 
-            _dataSource?.PublishProgress(new VisionAiProgressReport(
+            _dataSource?.PublishProgress(new LlmProgressReport(
                 phase,
                 callback.message));
 
-            if (phase == VisionAiPhase.Ready && callback.ready)
+            if (phase == LlmPhase.Ready && callback.ready)
             {
                 IsReady = true;
                 _engineInitializationInProgress = false;
                 _onRetryAvailabilityChanged?.Invoke(false);
             }
-            else if (phase == VisionAiPhase.Error)
+            else if (phase == LlmPhase.Error)
             {
                 IsReady = false;
                 _engineInitializationInProgress = false;
@@ -269,7 +269,7 @@ namespace LiteRtLmUnity
             }
         }
 
-        private void AnalyzeImage(VisionAiRequest request)
+        private void AnalyzeImage(ImageRequest request)
         {
             if (request == null || _dataSource == null)
             {
@@ -300,8 +300,8 @@ namespace LiteRtLmUnity
             _activeInferenceKind = InferenceKind.Image;
             _activeRequestId = ++_lastRequestId;
             BeginAnalysisTracking();
-            _dataSource.PublishProgress(new VisionAiProgressReport(
-                VisionAiPhase.Inferencing,
+            _dataSource.PublishProgress(new LlmProgressReport(
+                LlmPhase.Inferencing,
                 "Analyzing image... 0s"));
 
             try
@@ -319,7 +319,7 @@ namespace LiteRtLmUnity
                 bridge.CallStatic(
                     // Static Kotlin method to invoke.
                     "analyze",
-                    // Name of the GameObject that hosts this VisionAiManager.
+                    // Name of the GameObject that hosts this LlmManager.
                     // Kotlin uses UnitySendMessage to invoke its callback methods.
                     gameObject.name,
                     // Identifies this request so stale callbacks can be ignored.
@@ -387,8 +387,8 @@ namespace LiteRtLmUnity
             _activeInferenceKind = InferenceKind.Text;
             _activeRequestId = ++_lastRequestId;
             BeginAnalysisTracking();
-            _dataSource.PublishProgress(new VisionAiProgressReport(
-                VisionAiPhase.Inferencing,
+            _dataSource.PublishProgress(new LlmProgressReport(
+                LlmPhase.Inferencing,
                 "Generating response... 0s"));
 
             try
@@ -435,7 +435,7 @@ namespace LiteRtLmUnity
             }
 
             if (callback == null ||
-                !Enum.TryParse(callback.phase, out VisionAiPhase phase))
+                !Enum.TryParse(callback.phase, out LlmPhase phase))
             {
                 _inferenceInProgress = false;
                 EndAnalysisTracking();
@@ -448,9 +448,9 @@ namespace LiteRtLmUnity
                 return;
             }
 
-            if (phase == VisionAiPhase.Inferencing)
+            if (phase == LlmPhase.Inferencing)
             {
-                _dataSource?.PublishProgress(new VisionAiProgressReport(
+                _dataSource?.PublishProgress(new LlmProgressReport(
                     phase,
                     callback.message));
                 return;
@@ -459,7 +459,7 @@ namespace LiteRtLmUnity
             _inferenceInProgress = false;
             EndAnalysisTracking();
 
-            if (phase == VisionAiPhase.Error)
+            if (phase == LlmPhase.Error)
             {
                 PublishError(callback.message);
                 return;
@@ -467,8 +467,8 @@ namespace LiteRtLmUnity
 
             // Report Ready before the answer so the UI re-enables its capture
             // button first and the answer stays as the last text on screen.
-            _dataSource?.PublishProgress(new VisionAiProgressReport(
-                VisionAiPhase.Ready,
+            _dataSource?.PublishProgress(new LlmProgressReport(
+                LlmPhase.Ready,
                 callback.message));
             _dataSource?.PublishResultText(callback.resultText);
         }
@@ -508,8 +508,8 @@ namespace LiteRtLmUnity
 
             _engineInitializationInProgress = true;
             IsReady = false;
-            _dataSource?.PublishProgress(new VisionAiProgressReport(
-                VisionAiPhase.Initializing,
+            _dataSource?.PublishProgress(new LlmProgressReport(
+                LlmPhase.Initializing,
                 "Initializing AI engine..."));
 
             try
@@ -530,8 +530,8 @@ namespace LiteRtLmUnity
 
         private void PublishError(string message)
         {
-            _dataSource?.PublishProgress(new VisionAiProgressReport(
-                VisionAiPhase.Error,
+            _dataSource?.PublishProgress(new LlmProgressReport(
+                LlmPhase.Error,
                 message));
         }
 

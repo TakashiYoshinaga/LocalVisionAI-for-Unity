@@ -4,7 +4,7 @@ using UnityEngine;
 /// Keeps the panel this component is attached to above Android's docked
 /// software keyboard while the prompt field has focus. The behaviour belongs
 /// to this piece of UI, so it lives here instead of in
-/// <see cref="MainCoordinator"/>.
+/// <see cref="ImagePromptCoordinator"/>.
 /// </summary>
 [RequireComponent(typeof(RectTransform))]
 public class InputFieldPositionOptimizer : MonoBehaviour

@@ -14,7 +14,7 @@ namespace LiteRtLmUnity
 
         [SerializeField] private ARCameraManager _cameraManager;
 
-        private VisionAiDataSource _dataSource;
+        private LlmDataSource _dataSource;
         private Action<bool> _onCaptureAvailabilityChanged;
         private bool _captureInProgress;
         private bool _inferenceInProgress;
@@ -27,10 +27,10 @@ namespace LiteRtLmUnity
         /// and decides how to reflect that, so this class never touches a UI type.
         /// </summary>
         public void Initialize(
-            VisionAiDataSource visionAiDataSource,
+            LlmDataSource llmDataSource,
             Action<bool> onCaptureAvailabilityChanged)
         {
-            _dataSource = visionAiDataSource;
+            _dataSource = llmDataSource;
             _onCaptureAvailabilityChanged = onCaptureAvailabilityChanged;
 
             _onCaptureAvailabilityChanged?.Invoke(false);
@@ -76,8 +76,8 @@ namespace LiteRtLmUnity
 
             _captureInProgress = true;
             _onCaptureAvailabilityChanged?.Invoke(false);
-            _dataSource?.PublishProgress(new VisionAiProgressReport(
-                VisionAiPhase.Capturing,
+            _dataSource?.PublishProgress(new LlmProgressReport(
+                LlmPhase.Capturing,
                 "Capturing camera image..."));
 
             NativeArray<byte> convertedData = default;
@@ -112,7 +112,7 @@ namespace LiteRtLmUnity
 
                 orientedTexture = ApplyScreenOrientation(convertedTexture);
                 byte[] jpegData = orientedTexture.EncodeToJPG(JpegQuality);
-                var request = new VisionAiRequest(
+                var request = new ImageRequest(
                     jpegData,
                     orientedTexture.width,
                     orientedTexture.height);
@@ -150,23 +150,23 @@ namespace LiteRtLmUnity
             }
         }
 
-        private void HandleProgressReport(VisionAiProgressReport report)
+        private void HandleProgressReport(LlmProgressReport report)
         {
             switch (report.Phase)
             {
-                case VisionAiPhase.Ready:
+                case LlmPhase.Ready:
                     _aiReady = true;
                     _inferenceInProgress = false;
                     break;
-                case VisionAiPhase.ExtractingModel:
-                case VisionAiPhase.Initializing:
+                case LlmPhase.ExtractingModel:
+                case LlmPhase.Initializing:
                     _aiReady = false;
                     _inferenceInProgress = false;
                     break;
-                case VisionAiPhase.Inferencing:
+                case LlmPhase.Inferencing:
                     _inferenceInProgress = true;
                     break;
-                case VisionAiPhase.Error:
+                case LlmPhase.Error:
                     _inferenceInProgress = false;
                     break;
             }
@@ -260,8 +260,8 @@ namespace LiteRtLmUnity
 
         private void PublishError(string message)
         {
-            _dataSource?.PublishProgress(new VisionAiProgressReport(
-                VisionAiPhase.Error,
+            _dataSource?.PublishProgress(new LlmProgressReport(
+                LlmPhase.Error,
                 message));
         }
 

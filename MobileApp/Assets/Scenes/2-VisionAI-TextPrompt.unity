@@ -1207,7 +1207,7 @@ GameObject:
   - component: {fileID: 705766225}
   - component: {fileID: 705766223}
   m_Layer: 0
-  m_Name: VisionAI Manager
+  m_Name: LLM Manager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1224,7 +1224,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 418e50d5f36b4476c9a86575a7721b7c, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::VisionAiManager
+  m_EditorClassIdentifier: Assembly-CSharp::LlmManager
   _enableThinking: 0
   _thinkingTokenBudget: 256
   _answerTokenBudget: 512
@@ -2675,7 +2675,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 765b6e8fb9bed479c898e8490eea690f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TextPromptCoordinator
-  _visionAiManager: {fileID: 705766223}
+  _llmManager: {fileID: 705766223}
   _showResultManager: {fileID: 2026897821}
   _resultText: {fileID: 1151359910}
   _statusText: {fileID: 1338870964}

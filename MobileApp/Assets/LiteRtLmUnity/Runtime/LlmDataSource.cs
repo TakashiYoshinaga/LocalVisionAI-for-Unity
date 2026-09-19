@@ -3,17 +3,17 @@ using R3;
 
 namespace LiteRtLmUnity
 {
-    public sealed class VisionAiDataSource : IDisposable
+    public sealed class LlmDataSource : IDisposable
     {
-        private readonly Subject<VisionAiRequest> _imageRequestSubject = new();
+        private readonly Subject<ImageRequest> _imageRequestSubject = new();
         private readonly Subject<string> _resultTextSubject = new();
-        private readonly Subject<VisionAiProgressReport> _progressSubject = new();
+        private readonly Subject<LlmProgressReport> _progressSubject = new();
 
-        public Observable<VisionAiRequest> ImageRequests => _imageRequestSubject;
+        public Observable<ImageRequest> ImageRequests => _imageRequestSubject;
         public Observable<string> ResultText => _resultTextSubject;
-        public Observable<VisionAiProgressReport> ProgressReports => _progressSubject;
+        public Observable<LlmProgressReport> ProgressReports => _progressSubject;
 
-        public void PublishImageRequest(VisionAiRequest request)
+        public void PublishImageRequest(ImageRequest request)
         {
             _imageRequestSubject.OnNext(request);
         }
@@ -23,7 +23,7 @@ namespace LiteRtLmUnity
             _resultTextSubject.OnNext(resultText);
         }
 
-        public void PublishProgress(VisionAiProgressReport report)
+        public void PublishProgress(LlmProgressReport report)
         {
             _progressSubject.OnNext(report);
         }

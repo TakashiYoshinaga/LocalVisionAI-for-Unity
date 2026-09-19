@@ -2,14 +2,14 @@ using UnityEngine;
 
 namespace LiteRtLmUnity
 {
-    public readonly struct VisionAiProgressReport
+    public readonly struct LlmProgressReport
     {
-        public VisionAiPhase Phase { get; }
+        public LlmPhase Phase { get; }
         public string Message { get; }
         public float? Progress01 { get; }
 
-        public VisionAiProgressReport(
-            VisionAiPhase phase,
+        public LlmProgressReport(
+            LlmPhase phase,
             string message,
             float? progress01 = null)
         {
