@@ -36,7 +36,9 @@ namespace LiteRtLmUnity
         [SerializeField, Range(0f, 1f)] private float _topP = DefaultTopP;
         [Tooltip("Higher values make the answer more varied, lower values more repeatable. Used only when Top K is 2 or more.")]
         [SerializeField, Min(0f)] private float _temperature = DefaultTemperature;
-        [Tooltip("Random seed for sampling. Used only when Top K is 2 or more.")]
+        [Tooltip("Draws a new seed for every request, so the same question can produce a different answer. Used only when Top K is 2 or more.")]
+        [SerializeField] private bool _randomizeSeed = true;
+        [Tooltip("Fixed seed that makes sampling reproducible. Used only when Randomize Seed is off and Top K is 2 or more.")]
         [SerializeField] private int _seed;
 
         [Header("Analysis Monitoring")]
@@ -362,7 +364,7 @@ namespace LiteRtLmUnity
                     // Logit scaling; higher values vary the answer more.
                     _temperature,
                     // Random seed for sampling.
-                    _seed);
+                    ResolveSeed());
             }
             catch (Exception exception)
             {
@@ -436,7 +438,7 @@ namespace LiteRtLmUnity
                     _topK,
                     _topP,
                     _temperature,
-                    _seed);
+                    ResolveSeed());
             }
             catch (Exception exception)
             {
@@ -557,6 +559,19 @@ namespace LiteRtLmUnity
                 PublishError($"Could not start AI initialization: {exception.Message}");
             }
     #endif
+        }
+
+        /// <summary>
+        /// Picks the seed for one request. A fresh seed per request is what makes
+        /// the same question answer differently, because every request starts a new
+        /// conversation and therefore restarts the sampler's random sequence.
+        /// The seed never matters while Top K is 1, which is greedy decoding.
+        /// </summary>
+        private int ResolveSeed()
+        {
+            return _randomizeSeed
+                ? UnityEngine.Random.Range(1, int.MaxValue)
+                : _seed;
         }
 
         private void PublishError(string message)

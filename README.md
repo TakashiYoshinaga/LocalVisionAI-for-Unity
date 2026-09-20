@@ -130,11 +130,14 @@ These can be changed in the Inspector of `LlmManager` on the `LLM Manager` objec
 | Top K | 1 | Number of candidate tokens. 1 is greedy decoding and ignores Top P and Temperature. 0 or less leaves the sampler to LiteRT-LM |
 | Top P | 0.95 | Cumulative probability cutoff. Used only when Top K is 2 or more |
 | Temperature | 1 | Higher values make the answer more varied, lower values more repeatable. Used only when Top K is 2 or more |
-| Seed | 0 | Random seed for sampling. Used only when Top K is 2 or more |
+| Randomize Seed | On | Draws a new seed for every request, so the same question can produce a different answer. Used only when Top K is 2 or more |
+| Seed | 0 | Fixed seed that makes sampling reproducible. Used only when Randomize Seed is off and Top K is 2 or more |
 
 The thinking content is written neither to the screen nor to the log. Changing these settings does not reload the model.
 
 The sampling defaults are the ones LiteRT-LM applies when neither the model file nor the app specifies any, so the shipped values keep the previous behavior: with Top K at 1 every answer is the same for the same input. Raise Top K to 2 or more before Temperature has any effect.
+
+Every request starts a new conversation, so sampling restarts from the seed each time. Leave Randomize Seed on to get a different answer for the same question, or turn it off and fix Seed to reproduce one exactly.
 
 While inference is running, elapsed seconds are displayed. Past 30 seconds the display switches to a long-running warning, and past 120 seconds to a timeout warning. Native inference cannot be interrupted safely, so if it still does not finish after the timeout warning, restart the app.
 
