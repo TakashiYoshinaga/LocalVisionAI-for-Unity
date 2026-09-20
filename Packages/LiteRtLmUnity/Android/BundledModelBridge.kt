@@ -15,6 +15,7 @@ import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.Message
+import com.google.ai.edge.litertlm.SamplerConfig
 import com.google.ai.edge.litertlm.ThinkingConfig
 import com.unity3d.player.UnityPlayer
 import org.json.JSONObject
@@ -156,7 +157,11 @@ object BundledModelBridge {
         userPrompt: String,
         enableThinking: Boolean,
         thinkingTokenBudget: Int,
-        answerTokenBudget: Int
+        answerTokenBudget: Int,
+        topK: Int,
+        topP: Float,
+        temperature: Float,
+        seed: Int
     ) {
         if (!isAnalyzing.compareAndSet(false, true)) {
             sendAnalysis(
@@ -178,7 +183,11 @@ object BundledModelBridge {
                     userPrompt,
                     enableThinking,
                     thinkingTokenBudget,
-                    answerTokenBudget
+                    answerTokenBudget,
+                    topK,
+                    topP,
+                    temperature,
+                    seed
                 )
             } catch (throwable: Throwable) {
                 Log.e(LOG_TAG, "Image analysis failed.", throwable)
@@ -202,7 +211,11 @@ object BundledModelBridge {
         userPrompt: String,
         enableThinking: Boolean,
         thinkingTokenBudget: Int,
-        answerTokenBudget: Int
+        answerTokenBudget: Int,
+        topK: Int,
+        topP: Float,
+        temperature: Float,
+        seed: Int
     ) {
         if (systemPrompt.isBlank()) {
             sendAnalysis(
@@ -243,7 +256,11 @@ object BundledModelBridge {
                     userPrompt,
                     enableThinking,
                     thinkingTokenBudget,
-                    answerTokenBudget
+                    answerTokenBudget,
+                    topK,
+                    topP,
+                    temperature,
+                    seed
                 )
             } catch (throwable: Throwable) {
                 Log.e(LOG_TAG, "Text generation failed.", throwable)
@@ -355,7 +372,11 @@ object BundledModelBridge {
         userPrompt: String,
         enableThinking: Boolean,
         thinkingTokenBudget: Int,
-        answerTokenBudget: Int
+        answerTokenBudget: Int,
+        topK: Int,
+        topP: Float,
+        temperature: Float,
+        seed: Int
     ) {
         if (imageData.isEmpty()) {
             throw IllegalArgumentException("The captured image was empty.")
@@ -390,7 +411,8 @@ object BundledModelBridge {
                 ?.let { Contents.of(it) },
             channels = if (enableThinking) listOf(thinkingChannel) else emptyList(),
             maxOutputToken = if (answerTokenBudget > 0) answerTokenBudget else null,
-            thinkingConfig = ThinkingConfig(enableThinking, thinkingTokenBudget)
+            thinkingConfig = ThinkingConfig(enableThinking, thinkingTokenBudget),
+            samplerConfig = createSamplerConfig(topK, topP, temperature, seed)
         )
         val answer = activeEngine.createConversation(config).use { conversation ->
             extractText(conversation.sendMessage(contents))
@@ -431,7 +453,11 @@ object BundledModelBridge {
         userPrompt: String,
         enableThinking: Boolean,
         thinkingTokenBudget: Int,
-        answerTokenBudget: Int
+        answerTokenBudget: Int,
+        topK: Int,
+        topP: Float,
+        temperature: Float,
+        seed: Int
     ) {
         require(systemPrompt.isNotBlank()) { "The System Prompt is not configured." }
         require(userPrompt.isNotBlank()) { "The User Prompt is empty." }
@@ -452,7 +478,8 @@ object BundledModelBridge {
             systemInstruction = Contents.of(systemPrompt),
             channels = if (enableThinking) listOf(thinkingChannel) else emptyList(),
             maxOutputToken = if (answerTokenBudget > 0) answerTokenBudget else null,
-            thinkingConfig = ThinkingConfig(enableThinking, thinkingTokenBudget)
+            thinkingConfig = ThinkingConfig(enableThinking, thinkingTokenBudget),
+            samplerConfig = createSamplerConfig(topK, topP, temperature, seed)
         )
         val startedAt = SystemClock.elapsedRealtime()
 
@@ -518,6 +545,32 @@ object BundledModelBridge {
                 append(if (open >= 0) part.substring(0, open) else part)
             }
         }
+    }
+
+    /**
+     * Builds the per-conversation sampler settings. A topK of 1 is greedy
+     * decoding: the highest scoring token always wins and topP and temperature
+     * have no effect. Passing 0 or less leaves samplerConfig null, which makes
+     * LiteRT-LM fall back to the model's own parameters, or to its built-in
+     * TOP_P defaults (k 1, p 0.95, temperature 1.0) when the model file carries
+     * none.
+     */
+    private fun createSamplerConfig(
+        topK: Int,
+        topP: Float,
+        temperature: Float,
+        seed: Int
+    ): SamplerConfig? {
+        if (topK <= 0) {
+            return null
+        }
+
+        return SamplerConfig(
+            topK = topK,
+            topP = topP.toDouble(),
+            temperature = temperature.toDouble(),
+            seed = seed
+        )
     }
 
     private fun createEngine(modelPath: String, mainBackend: Backend): Engine {

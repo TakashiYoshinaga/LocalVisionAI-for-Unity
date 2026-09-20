@@ -14,6 +14,9 @@ namespace LiteRtLmUnity
         private const string ModelAssetPath = BundledModelPaths.AndroidAssetPath;
         private const string ModelFileName = BundledModelPaths.FileName;
         private const int DefaultAnswerTokenBudget = 512;
+        private const int DefaultTopK = 1;
+        private const float DefaultTopP = 0.95f;
+        private const float DefaultTemperature = 1.0f;
 
         [Header("Thinking")]
         [Tooltip("Applied at the start of each inference. Changing it never reloads the engine.")]
@@ -23,6 +26,18 @@ namespace LiteRtLmUnity
         [Header("Answer")]
         [Tooltip("Maximum answer tokens. 0 or less means no limit.")]
         [SerializeField] private int _answerTokenBudget = DefaultAnswerTokenBudget;
+
+        [Header("Sampling")]
+        // These mirror the LiteRT-LM defaults for this model, so the shipped
+        // values reproduce the behavior this sample had before they existed.
+        [Tooltip("Number of candidate tokens. 1 is greedy decoding and ignores Top P and Temperature. 0 or less leaves the sampler to LiteRT-LM.")]
+        [SerializeField] private int _topK = DefaultTopK;
+        [Tooltip("Cumulative probability cutoff. Used only when Top K is 2 or more.")]
+        [SerializeField, Range(0f, 1f)] private float _topP = DefaultTopP;
+        [Tooltip("Higher values make the answer more varied, lower values more repeatable. Used only when Top K is 2 or more.")]
+        [SerializeField, Min(0f)] private float _temperature = DefaultTemperature;
+        [Tooltip("Random seed for sampling. Used only when Top K is 2 or more.")]
+        [SerializeField] private int _seed;
 
         [Header("Analysis Monitoring")]
         [Tooltip("Show a long-running warning after this many seconds.")]
@@ -338,7 +353,16 @@ namespace LiteRtLmUnity
                     // Maximum tokens allocated to the internal thinking channel.
                     _thinkingTokenBudget,
                     // Maximum answer tokens; 0 or less uses the model default.
-                    _answerTokenBudget);
+                    _answerTokenBudget,
+                    // Candidate token count; 1 is greedy, 0 or less uses the
+                    // LiteRT-LM default.
+                    _topK,
+                    // Cumulative probability cutoff.
+                    _topP,
+                    // Logit scaling; higher values vary the answer more.
+                    _temperature,
+                    // Random seed for sampling.
+                    _seed);
             }
             catch (Exception exception)
             {
@@ -408,7 +432,11 @@ namespace LiteRtLmUnity
                     userPrompt,
                     _enableThinking,
                     _thinkingTokenBudget,
-                    _answerTokenBudget);
+                    _answerTokenBudget,
+                    _topK,
+                    _topP,
+                    _temperature,
+                    _seed);
             }
             catch (Exception exception)
             {

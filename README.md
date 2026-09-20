@@ -127,8 +127,14 @@ These can be changed in the Inspector of `LlmManager` on the `LLM Manager` objec
 | Enable Thinking | Off | Enables the thinking process. Roughly doubles inference time |
 | Thinking Token Budget | 256 | Maximum number of tokens spent on thinking |
 | Answer Token Budget | 512 | Maximum tokens in the answer. Unlimited when 0 or less |
+| Top K | 1 | Number of candidate tokens. 1 is greedy decoding and ignores Top P and Temperature. 0 or less leaves the sampler to LiteRT-LM |
+| Top P | 0.95 | Cumulative probability cutoff. Used only when Top K is 2 or more |
+| Temperature | 1 | Higher values make the answer more varied, lower values more repeatable. Used only when Top K is 2 or more |
+| Seed | 0 | Random seed for sampling. Used only when Top K is 2 or more |
 
 The thinking content is written neither to the screen nor to the log. Changing these settings does not reload the model.
+
+The sampling defaults are the ones LiteRT-LM applies when neither the model file nor the app specifies any, so the shipped values keep the previous behavior: with Top K at 1 every answer is the same for the same input. Raise Top K to 2 or more before Temperature has any effect.
 
 While inference is running, elapsed seconds are displayed. Past 30 seconds the display switches to a long-running warning, and past 120 seconds to a timeout warning. Native inference cannot be interrupted safely, so if it still does not finish after the timeout warning, restart the app.
 
