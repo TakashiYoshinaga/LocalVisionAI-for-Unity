@@ -60,9 +60,7 @@ LiteRT-LMのAndroidライブラリはビルド時にGradleのMaven依存とし�
 
 ### 1. モデルを用意する
 
-[litert-community/gemma-4-E2B-it-litert-lm](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm)から`gemma-4-E2B-it.litertlm`をダウンロードし、次の場所に置きます。
-
-使用するプロジェクトの`LocalModels`へ配置します。
+[litert-community/gemma-4-E2B-it-litert-lm](https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm)から`gemma-4-E2B-it.litertlm`をダウンロードし、使用するプロジェクトの`LocalModels`フォルダへ配置します。
 
 ```text
 ARFoundationApp/LocalModels/gemma-4-E2B-it.litertlm
@@ -104,8 +102,6 @@ APKは2.6GB前後になります。
 
 展開が終わるとAIエンジンが初期化され、`AI Ready`と表示されたら画像シーンでは`Search`、テキストシーンでは入力後に`Send`が押せるようになります。
 
-
-
 ## Tips: 指定した対象から文字と数値だけを抽出する
 
 両プロジェクトの`1-VisionAI-UserPrompt`シーンは、OCRのような使い方もできます。Hierarchyの`LLM Manager`を選択し、`LlmManager`のSystem Promptへ次のように設定します。
@@ -139,6 +135,7 @@ Hierarchyの`LLM Manager`が持つ`LlmManager`のInspectorから変更できま�
 思考の内容は画面にもログにも出力されません。設定を変えてもモデルの再読み込みは発生しません。
 
 サンプリングの既定値は、モデルファイルにもアプリにも指定がない場合にLiteRT-LMが適用する値と同じです。そのため既定のままなら従来どおりの動作で、Top Kが1の間は同じ入力に対して常に同じ回答が返ります。Temperatureを効かせるにはTop Kを2以上にしてください。
+
 推論中は経過秒数が表示され、30秒を超えると長時間警告、120秒を超えるとタイムアウト警告へ切り替わります。ネイティブ推論は安全に中断できないため、タイムアウト後も完了しない場合はアプリを再起動してください。
 
 ## 構成
