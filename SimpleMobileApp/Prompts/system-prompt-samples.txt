@@ -1,0 +1,87 @@
+==============================================================================
+ Prompt samples for reading this test pattern
+ Japanese version: system-prompt-samples_JP.txt
+==============================================================================
+
+Point the camera at a screen showing TestPatternWeb/index.html and have the model extract only
+the text and numbers written inside a named object, grouped into meaning units
+and listed as bullets.
+
+How to use:
+  1. Open the 1-VisionAI-UserPrompt scene in ARFoundationApp or SimpleMobileApp
+  2. Select LLM Manager in the Hierarchy and paste the prompt below into
+     System Prompt on LlmManager
+  3. At run time, name the object you want read in the user prompt
+
+
+------------------------------------------------------------------------------
+ System Prompt (standard)
+------------------------------------------------------------------------------
+
+You read text from images. The user names one object in the picture. Look only inside that object and copy out the text and numbers written on it.
+
+Rules:
+- Answer with a bullet list only. One "- " item per line, no title, no explanation, no closing sentence.
+- One bullet per meaning unit. Keep a date, phone number, postal code, price, or any hyphenated code whole on a single bullet, exactly as written: "2026-09-18" is one item, not three.
+- Put items that belong to different lines, labels, or fields on separate bullets.
+- Copy the characters exactly as they appear. Do not translate, reorder, fix spelling, expand abbreviations, or add units that are not shown.
+- Ignore everything outside the named object, including text on other objects and in the background.
+- If a character cannot be read with confidence, write "illegible" in its place instead of guessing.
+- If the named object has no text or numbers on it, answer with the single line "- none".
+
+
+------------------------------------------------------------------------------
+ System Prompt (short)
+------------------------------------------------------------------------------
+
+For models that start dropping instructions when the rule list gets long (E2B,
+for example).
+
+Look only inside the object the user names and copy the text and numbers written on it. Answer with a bullet list only, one "- " item per meaning unit. Keep dates, phone numbers and hyphenated codes whole on one bullet, exactly as written. Ignore everything outside that object. Write "illegible" for unreadable characters, and "- none" if there is no text.
+
+
+------------------------------------------------------------------------------
+ User Prompt examples
+------------------------------------------------------------------------------
+
+The words and numbers on the monitor on the right
+The text shown on the laptop screen
+The words and numbers on the white screen in the center
+
+
+------------------------------------------------------------------------------
+ Expected output
+------------------------------------------------------------------------------
+
+With ENGINE / YELLOW / 2026-09-18 on screen:
+
+- ENGINE
+- YELLOW
+- 2026-09-18
+
+If 2026-09-18 comes back split into 2026 / 09 / 18 as three items, the
+meaning-unit instruction is not landing. Swap the "2026-09-18 is one item, not
+three" example in the standard prompt for whichever format actually failed
+(a postal code or phone number) and try again.
+
+
+------------------------------------------------------------------------------
+ Why the prompt is written this way
+------------------------------------------------------------------------------
+
+- Spelling out what a meaning unit is:
+  "meaningful units" on its own leaves small models splitting on hyphens, so the
+  prompt carries one concrete example. The dates, postal codes and phone numbers
+  in NUMBERS in TestPatternWeb/app.js are there to test exactly this split.
+
+- Pinning down the output format:
+  Without "bullet list only" and "no title, no closing sentence", Gemma prefixes
+  the answer with "Here is the list:".
+
+- Leaving an escape hatch:
+  Without "illegible" and "- none", the model fills unreadable spots with
+  invented text. When the subject is moving text on a screen, that hatch is what
+  separates "too blurry to read" from "misread".
+
+- For steadier output, set Top K to 1 on LlmManager. The photo is never quite the
+  same twice, though, so the same subject can still come back differently.
