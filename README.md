@@ -144,7 +144,7 @@ Change these on `LlmManager` under `LLM Manager`.
 | Randomize Seed | On | Changes the seed for every request |
 | Seed | 0 | Fixed value used when Randomize Seed is off |
 
-Changing settings does not reload the model, and thinking content is not written to the screen or log. Top K at 1 always selects the strongest candidate. For reproducible sampling with Top K at 2 or more, turn Randomize Seed off and choose a fixed Seed.
+Changing settings does not reload the model, and thinking content is not written to the screen or log. With Top K set to 1, the same input produces nearly the same result each time. For reproducible sampling with Top K at 2 or more, turn Randomize Seed off and choose a fixed Seed.
 
 During inference, the UI shows elapsed time. It switches to a long-running warning after 30 seconds and a timeout warning after 120 seconds. Native inference cannot be interrupted safely; restart the app if it still does not complete.
 
