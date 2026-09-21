@@ -134,6 +134,11 @@ InitTestScene*.unity*
 **/[Aa]ssets/Plugins/x86_64/
 **/[Aa]ssets/Plugins/x86_64.meta
 
+# Created by pressing Play, and holding one person's model path and test
+# image, so it is theirs rather than the repository's.
+**/[Aa]ssets/[Ee]ditor/LiteRtLmEditorSettings.asset
+**/[Aa]ssets/[Ee]ditor/LiteRtLmEditorSettings.asset.meta
+
 # Local Android signing material
 *.keystore
 *.jks

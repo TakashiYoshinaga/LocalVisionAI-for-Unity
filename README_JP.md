@@ -105,11 +105,9 @@ APKは2.6GB前後になります。
 
 ### 4. Editorで動かす（macOS / Windows）
 
-プロンプトを変えるたびにBuild & Runを待たずに済むよう、Unity Editorでも`LocalModels/`にあるものと同じ`.litertlm`をそのまま実行できます。サーバも別モデルも不要です。Androidビルド側は従来どおりKotlinブリッジ経由で、何も変わりません。
+プロンプトを変えるたびにBuild & Runを待たずに済むよう、Unity Editorでも`LocalModels/`にあるものと同じ`.litertlm`をそのまま実行できます。
 
-1. メニューの`Tools > LiteRT-LM > Install Editor Native Library`を実行します。LiteRT-LMのリリースから実行中のOS向けのビルド済みライブラリを取得し、Editor専用プラグインとして配置します。APKには含まれません。
-   - macOSでは`libCLiteRTLM_mac.dylib`（約140MB）を`Assets/Plugins/macOS/`へ。
-   - Windowsでは`litert-lm.dll`（約48MB）を`Assets/Plugins/x86_64/`へ。あわせてGPU実行に必要なDirectX Shader Compiler（`dxcompiler.dll`と`dxil.dll`、約32MB）も取得します。ダウンロードは合計200MB程度です。
+1. メニューの`Tools > LiteRT-LM > Install Editor Native Library`を実行します。**必要なものは自動でダウンロードされ、そのまま配置されます**（macOSで約140MB、Windowsで約200MB）。手動での準備は不要で、APKにも含まれません。
 2. 一度Playすると`Assets/Editor/LiteRtLmEditorSettings.asset`が作られます。これを選び、`Test Image`にカメラ画像の代わりに解析したいテクスチャを割り当てます。
 3. もう一度Playします。カメラは開かず、割り当てた画像がUIの背後に表示され、`Search`でその画像が推論に渡されます。
 
@@ -128,6 +126,7 @@ APKは2.6GB前後になります。
 > **Editor実行時の違い**
 >
 > - macOSとWindowsのみです。LiteRT-LMがデスクトップ向けのビルド済みライブラリを配布しているのがこの2つのためです。LinuxのEditorでは従来どおり実機でのビルドが必要です。
+> - ダウンロードしたものは`Assets/Plugins/macOS/`または`Assets/Plugins/x86_64/`に置かれ、Git管理外です。WindowsではGPU実行に必要なDirectX Shader Compilerも一緒に取得します（Unity同梱のものはバージョンが古く使えないため）。
 > - `Sampling`の設定（Top K / Top P / Temperature / Seed）が効くのはGPUのときだけです。デスクトップのCPU実行にはサンプラを差し替える仕組みがないため、CPUへフォールバックした場合は警告を出したうえで無視します。実機では常に反映されます。
 > - テスト画像は両プロジェクトで使います。Editorではどちらのカメラも画像を返さないためです。`ARFoundationApp`はカメラ映像がARの背景でUIの要素ではないため、Play中に全画面の画像を生成して表示します。
 

@@ -105,11 +105,9 @@ Once extraction finishes, the AI engine is initialized. When `AI Ready` appears,
 
 ### 4. Running in the Editor (macOS and Windows)
 
-So that changing a prompt does not mean waiting for another Build and Run, the Unity Editor can run the very same `.litertlm` file from `LocalModels/`. No server and no second model are involved, and the Android build keeps going through the Kotlin bridge exactly as before.
+So that changing a prompt does not mean waiting for another Build and Run, the Unity Editor can run the very same `.litertlm` file from `LocalModels/`.
 
-1. Run `Tools > LiteRT-LM > Install Editor Native Library`. It fetches the prebuilt library for your system from the LiteRT-LM releases and imports it as an Editor-only plugin, so it never reaches the APK.
-   - On macOS, `libCLiteRTLM_mac.dylib` (about 140 MB) into `Assets/Plugins/macOS/`.
-   - On Windows, `litert-lm.dll` (about 48 MB) into `Assets/Plugins/x86_64/`, together with the DirectX Shader Compiler (`dxcompiler.dll` and `dxil.dll`, about 32 MB) that the GPU path needs. Roughly 200 MB is downloaded in total.
+1. Run `Tools > LiteRT-LM > Install Editor Native Library`. Everything it needs is downloaded and set up for you — around 140 MB on macOS and 200 MB on Windows — so there is nothing to install by hand, and none of it reaches the APK.
 2. Press Play once; that creates `Assets/Editor/LiteRtLmEditorSettings.asset`. Select it and assign the texture you want analyzed to `Test Image`, in place of a camera frame.
 3. Press Play again. No camera is opened, the assigned image fills the view behind the UI, and `Search` sends that image to the model.
 
@@ -128,6 +126,7 @@ The first load writes LiteRT-LM's compiled weight and program caches, close to 2
 > **How the Editor differs**
 >
 > - macOS and Windows only, because those are the desktop systems LiteRT-LM publishes a prebuilt library for. On a Linux Editor, building to a device is still the only way.
+> - The download lands in `Assets/Plugins/macOS/` or `Assets/Plugins/x86_64/` and is left out of Git. On Windows it also brings the DirectX Shader Compiler, which the GPU path needs and Unity's own copy is too old to provide.
 > - The `Sampling` settings (Top K, Top P, Temperature, Seed) apply on the GPU only. The desktop CPU path has no configurable sampler, so after a fallback to the CPU they are ignored and a warning says so. They always apply on the device.
 > - Both projects use the test image, because neither camera returns anything in the Editor. `ARFoundationApp` shows it through a full-screen image created while playing, since its camera view is the AR background rather than a UI element.
 
