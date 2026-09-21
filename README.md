@@ -111,7 +111,7 @@ So that changing a prompt does not mean waiting for another Build and Run, the U
    - On macOS, `libCLiteRTLM_mac.dylib` (about 140 MB) into `Assets/Plugins/macOS/`.
    - On Windows, `litert-lm.dll` (about 48 MB) into `Assets/Plugins/x86_64/`, together with the DirectX Shader Compiler (`dxcompiler.dll` and `dxil.dll`, about 32 MB) that the GPU path needs. Roughly 200 MB is downloaded in total.
 2. Press Play once; that creates `Assets/Editor/LiteRtLmEditorSettings.asset`. Select it and assign the texture you want analyzed to `Test Image`, in place of a camera frame.
-3. Press Play again. No camera is opened, the assigned image fills the preview, and `Search` sends that image to the model.
+3. Press Play again. No camera is opened, and `Search` sends the assigned image to the model. In `SimpleMobileApp` the image also fills the preview; in `ARFoundationApp` the preview stays empty, because its camera view is the AR background rather than a UI image.
 
 `LiteRtLmEditorSettings` has three fields.
 
@@ -129,7 +129,7 @@ The first load writes LiteRT-LM's compiled weight and program caches, close to 2
 >
 > - macOS and Windows only, because those are the desktop systems LiteRT-LM publishes a prebuilt library for. On a Linux Editor, building to a device is still the only way.
 > - The `Sampling` settings (Top K, Top P, Temperature, Seed) apply on the GPU only. The desktop CPU path has no configurable sampler, so after a fallback to the CPU they are ignored and a warning says so. They always apply on the device.
-> - The test image is used by `SimpleMobileApp`. The `ARFoundationApp` camera returns no image in the Editor.
+> - Both projects use the test image, because neither camera returns anything in the Editor. Only `SimpleMobileApp` can show it, so in `ARFoundationApp` you are analyzing a picture you cannot see on screen.
 
 ## Tips: extracting only text and numbers from a chosen subject
 
