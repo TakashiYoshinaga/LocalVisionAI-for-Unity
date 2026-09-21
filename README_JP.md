@@ -111,7 +111,7 @@ APKは2.6GB前後になります。
    - macOSでは`libCLiteRTLM_mac.dylib`（約140MB）を`Assets/Plugins/macOS/`へ。
    - Windowsでは`litert-lm.dll`（約48MB）を`Assets/Plugins/x86_64/`へ。あわせてGPU実行に必要なDirectX Shader Compiler（`dxcompiler.dll`と`dxil.dll`、約32MB）も取得します。ダウンロードは合計200MB程度です。
 2. 一度Playすると`Assets/Editor/LiteRtLmEditorSettings.asset`が作られます。これを選び、`Test Image`にカメラ画像の代わりに解析したいテクスチャを割り当てます。
-3. もう一度Playします。カメラは開かず、`Search`で割り当てた画像が推論に渡されます。`SimpleMobileApp`ではその画像がプレビューにも表示されます。`ARFoundationApp`はカメラ映像がARの背景でUIの画像ではないため、プレビューには何も出ません。
+3. もう一度Playします。カメラは開かず、割り当てた画像がUIの背後に表示され、`Search`でその画像が推論に渡されます。
 
 `LiteRtLmEditorSettings`の項目は3つです。
 
@@ -129,7 +129,7 @@ APKは2.6GB前後になります。
 >
 > - macOSとWindowsのみです。LiteRT-LMがデスクトップ向けのビルド済みライブラリを配布しているのがこの2つのためです。LinuxのEditorでは従来どおり実機でのビルドが必要です。
 > - `Sampling`の設定（Top K / Top P / Temperature / Seed）が効くのはGPUのときだけです。デスクトップのCPU実行にはサンプラを差し替える仕組みがないため、CPUへフォールバックした場合は警告を出したうえで無視します。実機では常に反映されます。
-> - テスト画像は両プロジェクトで使います。Editorではどちらのカメラも画像を返さないためです。表示できるのは`SimpleMobileApp`だけなので、`ARFoundationApp`では画面に見えていない画像を解析することになります。
+> - テスト画像は両プロジェクトで使います。Editorではどちらのカメラも画像を返さないためです。`ARFoundationApp`はカメラ映像がARの背景でUIの要素ではないため、Play中に全画面の画像を生成して表示します。
 
 ## Tips: 指定した対象から文字と数値だけを抽出する
 
