@@ -127,17 +127,17 @@ These can be changed in the Inspector of `LlmManager` on the `LLM Manager` objec
 | Enable Thinking | Off | Enables the thinking process. Roughly doubles inference time |
 | Thinking Token Budget | 256 | Maximum number of tokens spent on thinking |
 | Answer Token Budget | 512 | Maximum tokens in the answer. Unlimited when 0 or less |
-| Top K | 1 | Number of candidate tokens. 1 is greedy decoding and ignores Top P and Temperature. 0 or less leaves the sampler to LiteRT-LM |
-| Top P | 0.95 | Cumulative probability cutoff. Used only when Top K is 2 or more |
-| Temperature | 1 | Higher values make the answer more varied, lower values more repeatable. Used only when Top K is 2 or more |
-| Randomize Seed | On | Draws a new seed for every request, so the same question can produce a different answer. Used only when Top K is 2 or more |
-| Seed | 0 | Fixed seed that makes sampling reproducible. Used only when Randomize Seed is off and Top K is 2 or more |
+| Top K | 1 | How many candidates the model picks its next word from. 1 means it always takes the most likely one, so the same input tends to give the same answer and Top P, Temperature and Seed stop mattering. 0 or less leaves this to LiteRT-LM |
+| Top P | 0.95 | Discards unlikely candidates, keeping only the top ones that together account for this share of the probability. Used only when Top K is 2 or more |
+| Temperature | 1 | Higher values make the wording more varied, lower values more predictable. Used only when Top K is 2 or more |
+| Randomize Seed | On | Starts each request from a new random draw, so asking the same question again can give a different answer. Used only when Top K is 2 or more |
+| Seed | 0 | A fixed starting point for those random draws, which makes the same question give the same answer again. Used only when Randomize Seed is off and Top K is 2 or more |
 
 The thinking content is written neither to the screen nor to the log. Changing these settings does not reload the model.
 
-The sampling defaults are the ones LiteRT-LM applies when neither the model file nor the app specifies any, so the shipped values keep the previous behavior: with Top K at 1 every answer is the same for the same input. Raise Top K to 2 or more before Temperature has any effect.
+The sampling defaults are the ones LiteRT-LM applies when neither the model file nor the app specifies any, so the shipped values keep the previous behavior: with Top K at 1 the model always takes its strongest candidate, so the same input tends to give the same answer. An image is never quite the same twice, though, so a fresh photo of the same subject can still be answered differently. Temperature only begins to matter once Top K is 2 or more.
 
-Every request starts a new conversation, so sampling restarts from the seed each time. Leave Randomize Seed on to get a different answer for the same question, or turn it off and fix Seed to reproduce one exactly.
+Each request is a new conversation, so the random draws start over every time. Leave Randomize Seed on when asking again should give a different answer, or turn it off and fix Seed when the same question should come back with the same answer.
 
 While inference is running, elapsed seconds are displayed. Past 30 seconds the display switches to a long-running warning, and past 120 seconds to a timeout warning. Native inference cannot be interrupted safely, so if it still does not finish after the timeout warning, restart the app.
 
