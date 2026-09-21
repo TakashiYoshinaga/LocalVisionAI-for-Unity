@@ -743,6 +743,11 @@ MonoBehaviour:
   _enableThinking: 0
   _thinkingTokenBudget: 256
   _answerTokenBudget: 512
+  _topK: 64
+  _topP: 0.95
+  _temperature: 0.8
+  _randomizeSeed: 1
+  _seed: 0
   _slowAnalysisWarningSeconds: 30
   _analysisTimeoutSeconds: 120
   _systemPrompt: "Describe concisely what appears in this image. You don't need to

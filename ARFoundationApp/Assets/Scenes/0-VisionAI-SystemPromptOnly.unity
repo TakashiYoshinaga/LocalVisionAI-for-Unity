@@ -755,12 +755,18 @@ MonoBehaviour:
   _enableThinking: 0
   _thinkingTokenBudget: 256
   _answerTokenBudget: 512
+  _topK: 64
+  _topP: 0.95
+  _temperature: 0.8
+  _randomizeSeed: 1
+  _seed: 0
   _slowAnalysisWarningSeconds: 30
   _analysisTimeoutSeconds: 120
   _systemPrompt: "Describe concisely what appears in this image. You don't need to
     capture every detail\u2014just highlight the key landscape and scenery information
     (main subjects, setting, terrain, lighting, atmosphere). Respond in English."
   _userPrompt: 
+  _fallbackImagePrompt: Describe what is visible in this image clearly and concisely.
 --- !u!4 &705766225
 Transform:
   m_ObjectHideFlags: 0
