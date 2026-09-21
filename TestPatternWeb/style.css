@@ -1,0 +1,40 @@
+:root {
+  --bg: #ffffff;
+  --fg: #111111;
+  --font-size: 14vmin;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+.item {
+  position: absolute;
+  top: 0;
+  left: 0;
+  white-space: nowrap;
+  font-family: "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic UI", sans-serif;
+  font-weight: 300;
+  font-size: var(--font-size);
+  letter-spacing: 0.06em;
+  color: var(--fg);
+  user-select: none;
+  transform-origin: 0 0;  /* app.js が中心位置を自前で計算するため */
+  will-change: transform;
+}
