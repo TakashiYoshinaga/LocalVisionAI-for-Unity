@@ -30,6 +30,14 @@ The text sample creates a new conversation for every question — one question, 
 
 Each run takes from a few seconds to a few tens of seconds, and depends heavily on the device's performance.
 
+## Why this sample exists
+
+When OCR is used in an AR app, keeping a moving target perfectly inside a fixed ROI is difficult. The target itself may not be level, and users will not always capture it from an ideal angle or position. An app that only works under tightly controlled capture conditions easily hurts the user experience.
+
+So this sample takes a natural-language approach instead: users describe what they want extracted, rather than relying on a fixed ROI. In testing, extracting only the text and numbers inside a chosen monitor, and reading images captured while the phone was tilted, both worked correctly in most cases. Misses did happen, but only occasionally, and the approach held up well enough to be useful in situations like these.
+
+See [Tips: extracting only text and numbers from a chosen subject](#tips-extracting-only-text-and-numbers-from-a-chosen-subject) for how to set it up.
+
 ## Requirements
 
 | | |
