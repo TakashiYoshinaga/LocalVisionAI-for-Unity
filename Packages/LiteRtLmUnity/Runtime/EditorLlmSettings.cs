@@ -30,9 +30,9 @@ namespace LiteRtLmUnity
                  "folder of this project and of the other Unity projects beside it.")]
         [SerializeField] private string _modelFilePath = "";
 
-        [Tooltip("Use the GPU (Metal on macOS), which is several times faster than " +
-                 "the CPU. The backend falls back to the CPU on its own when the GPU " +
-                 "cannot load the model.")]
+        [Tooltip("Use the GPU (Metal on macOS, Direct3D 12 on Windows), which is " +
+                 "several times faster than the CPU. The backend falls back to the " +
+                 "CPU on its own when the GPU cannot load the model.")]
         [SerializeField] private bool _preferGpu = true;
 
         [Header("Camera Replacement")]

@@ -103,13 +103,13 @@ namespace LiteRtLmUnity
         /// </summary>
         private ILlmBackend CreateBackend()
         {
-#if UNITY_EDITOR_OSX
+#if UNITY_EDITOR_OSX || UNITY_EDITOR_WIN
             return new EditorLlmBackend(this);
 #elif UNITY_EDITOR
             return new UnsupportedLlmBackend(
                 this,
-                "Running the model in the Editor currently needs the macOS LiteRT-LM " +
-                "library. Build and run on an Android device instead.");
+                "Running the model in the Editor currently needs the macOS or Windows " +
+                "LiteRT-LM library. Build and run on an Android device instead.");
 #elif UNITY_ANDROID
             return new AndroidLlmBackend(this);
 #else

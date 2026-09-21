@@ -127,9 +127,12 @@ InitTestScene*.unity*
 
 # LiteRT-LM Editor library, installed on demand by
 # Tools > LiteRT-LM > Install Editor Native Library. 140 MB, and reproducible
-# from a GitHub release, so it is not tracked here.
+# from a GitHub release, so it is not tracked here. The Windows folder also
+# holds the DirectX Shader Compiler the GPU backend loads.
 **/[Aa]ssets/Plugins/macOS/
 **/[Aa]ssets/Plugins/macOS.meta
+**/[Aa]ssets/Plugins/x86_64/
+**/[Aa]ssets/Plugins/x86_64.meta
 
 # Local Android signing material
 *.keystore

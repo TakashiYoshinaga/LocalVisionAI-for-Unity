@@ -12,7 +12,7 @@ Android端末のカメラで撮った写真の説明やテキスト入力によ�
 `ARFoundationApp`は、今後AR機能を組み込めるようにAR Foundationでカメラを構成したバージョンです。現時点ではAR空間にオブジェクト、アンカー、平面認識結果などを表示する機能は実装していません。
 
 > **配布対象はAndroidのみです。** LiteRT-LMとの連携をAndroid固有のKotlinブリッジとGradle設定で行っているため、iOSやデスクトップ向けのビルドはできません。
-> ただし開発中は、Unity Editor（macOS）上で同じモデルをそのまま動かせます。[4. Editorで動かす（macOS）](#4-editorで動かすmacos)を参照してください。
+> ただし開発中は、Unity Editor（macOS / Windows）上で同じモデルをそのまま動かせます。[4. Editorで動かす（macOS / Windows）](#4-editorで動かすmacos--windows)を参照してください。
 
 ## デモ動画
 
@@ -103,11 +103,13 @@ APKは2.6GB前後になります。
 
 展開が終わるとAIエンジンが初期化され、`AI Ready`と表示されたら画像シーンでは`Search`、テキストシーンでは入力後に`Send`が押せるようになります。
 
-### 4. Editorで動かす（macOS）
+### 4. Editorで動かす（macOS / Windows）
 
 プロンプトを変えるたびにBuild & Runを待たずに済むよう、Unity Editorでも`LocalModels/`にあるものと同じ`.litertlm`をそのまま実行できます。サーバも別モデルも不要です。Androidビルド側は従来どおりKotlinブリッジ経由で、何も変わりません。
 
-1. メニューの`Tools > LiteRT-LM > Install Editor Native Library`を実行します。LiteRT-LMのリリースからmacOS用のビルド済みライブラリ（`libCLiteRTLM_mac.dylib`、約140MB）を取得し、`Assets/Plugins/macOS/`へEditor専用プラグインとして配置します。APKには含まれません。
+1. メニューの`Tools > LiteRT-LM > Install Editor Native Library`を実行します。LiteRT-LMのリリースから実行中のOS向けのビルド済みライブラリを取得し、Editor専用プラグインとして配置します。APKには含まれません。
+   - macOSでは`libCLiteRTLM_mac.dylib`（約140MB）を`Assets/Plugins/macOS/`へ。
+   - Windowsでは`litert-lm.dll`（約48MB）を`Assets/Plugins/x86_64/`へ。あわせてGPU実行に必要なDirectX Shader Compiler（`dxcompiler.dll`と`dxil.dll`、約32MB）も取得します。ダウンロードは合計200MB程度です。
 2. 一度Playすると`Assets/Editor/LiteRtLmEditorSettings.asset`が作られます。これを選び、`Test Image`にカメラ画像の代わりに解析したいテクスチャを割り当てます。
 3. もう一度Playします。カメラは開かず、割り当てた画像がプレビューに表示され、`Search`でその画像が推論に渡されます。
 
@@ -116,7 +118,7 @@ APKは2.6GB前後になります。
 | 設定 | 内容 |
 |---|---|
 | Model File Path | 使う`.litertlm`のパス。空欄なら、このプロジェクトの`LocalModels/`と、隣り合う他のUnityプロジェクトの`LocalModels/`を順に探します。2.6GBのモデルをプロジェクトごとにコピーせずに済みます。 |
-| Prefer Gpu | GPU（macOSではMetal）で動かします。読み込めなかった場合は自動でCPUへ切り替わります。 |
+| Prefer Gpu | GPU（macOSではMetal、WindowsではDirect3D 12）で動かします。読み込めなかった場合は自動でCPUへ切り替わります。CPUより3倍前後速いので、有効のままを推奨します。 |
 | Test Image | カメラ画像の代わりに送る静止画。 |
 
 エンジンはEditorのセッション中は読み込んだままなので、Playを押し直してもモデルの読み込みは繰り返されません。スクリプトの再コンパイル時とEditor終了時に解放されます。
@@ -125,7 +127,7 @@ APKは2.6GB前後になります。
 
 > **Editor実行時の違い**
 >
-> - macOSのみです。LiteRT-LMがデスクトップ向けのビルド済みライブラリを配布しているのがmacOSだけのためです。WindowsのEditorでは従来どおり実機でのビルドが必要です。
+> - macOSとWindowsのみです。LiteRT-LMがデスクトップ向けのビルド済みライブラリを配布しているのがこの2つのためです。LinuxのEditorでは従来どおり実機でのビルドが必要です。
 > - `Sampling`の設定（Top K / Top P / Temperature / Seed）が効くのはGPUのときだけです。デスクトップのCPU実行にはサンプラを差し替える仕組みがないため、CPUへフォールバックした場合は警告を出したうえで無視します。実機では常に反映されます。
 > - テスト画像を使うのは`SimpleMobileApp`です。`ARFoundationApp`のカメラはEditorでは画像を返しません。
 
@@ -178,7 +180,7 @@ Packages/LiteRtLmUnity/     再利用可能なLLM部分
     LlmManager              モデル展開、エンジン初期化、推論を管理する
     ILlmBackend             推論の実行方法を差し替えるための窓口
     AndroidLlmBackend       実機でKotlinブリッジを呼ぶ
-    EditorLlmBackend        EditorでLiteRT-LMのC APIを直接呼ぶ（macOS）
+    EditorLlmBackend        EditorでLiteRT-LMのC APIを直接呼ぶ（macOS / Windows）
     LiteRtLmNative          そのC APIのP/Invoke宣言
     EditorLlmSettings       Editor実行時のモデルとテスト画像の設定
     LlmDataSource           R3によるイベントハブ
@@ -203,7 +205,7 @@ UIの型を持つのは画像用の`ImagePromptCoordinator`とテキスト用の
 ## 制限事項
 
 - 配布できるのはAndroidのみです。iOSやデスクトップ向けのビルドには対応していません。
-- Editorでの実行はmacOSのみです。WindowsのEditorからモデルを動かすことはできません。
+- Editorでの実行はmacOSとWindowsのみです。LinuxのEditorからモデルを動かすことはできません。
 - 実機はPixel 7 (Android API 37)およびSamsung Galaxy S22で確認しています。他機種は未検証です。
 - 推論結果はストリーミング表示しません。完了までは経過時間と長時間警告のみ表示します。
 - テキストサンプルは会話履歴を保持しないため、前の質問を前提にした続きの会話はできません。

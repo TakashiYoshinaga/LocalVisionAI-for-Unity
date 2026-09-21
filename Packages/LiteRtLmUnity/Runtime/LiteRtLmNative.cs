@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Takashi Yoshinaga
 
-#if UNITY_EDITOR_OSX
+#if UNITY_EDITOR_OSX || UNITY_EDITOR_WIN
 
 using System;
 using System.Runtime.InteropServices;
@@ -14,12 +14,19 @@ namespace LiteRtLmUnity
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The library is the prebuilt <c>libCLiteRTLM_mac.dylib</c> from the
-    /// LiteRT-LM releases. It is not tracked by Git because of its size, so
+    /// The library is a prebuilt one from the LiteRT-LM releases:
+    /// <c>libCLiteRTLM_mac.dylib</c> on macOS and <c>litert-lm.dll</c> on
+    /// Windows. Neither is tracked by Git because of its size, so
     /// <c>Tools &gt; LiteRT-LM &gt; Install Editor Native Library</c> downloads it.
     /// Until it is installed every entry point throws
     /// <see cref="DllNotFoundException"/>, which the backend turns into an
     /// on-screen message.
+    /// </para>
+    /// <para>
+    /// The two libraries are built from different releases — see
+    /// <see cref="LiteRtLmUnity.EditorNativeLibrarySetup"/> for why — but every
+    /// entry point below has the same signature in both, so one set of
+    /// declarations covers them.
     /// </para>
     /// <para>
     /// Strings cross the boundary as explicitly UTF-8 encoded bytes rather than
@@ -29,7 +36,11 @@ namespace LiteRtLmUnity
     /// </remarks>
     internal static class LiteRtLmNative
     {
+#if UNITY_EDITOR_WIN
+        private const string Library = "litert-lm";
+#else
         private const string Library = "CLiteRTLM_mac";
+#endif
 
         /// <summary>Matches <c>LiteRtLmSamplerType</c> in <c>c/engine.h</c>.</summary>
         public const int SamplerTypeTopK = 1;

@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Takashi Yoshinaga
 
-#if UNITY_EDITOR_OSX
+#if UNITY_EDITOR_OSX || UNITY_EDITOR_WIN
 
 using System;
 using System.Collections.Concurrent;
 using System.IO;
+#if UNITY_EDITOR_WIN
+using System.Runtime.InteropServices;
+#endif
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -128,22 +131,30 @@ namespace LiteRtLmUnity
                 LiteRtLmNative.SetMinLogLevel(LiteRtLmNative.LogSeverityWarning);
 
                 string failure = null;
+                string gpuFailure = null;
 
                 if (preferGpu)
                 {
-                    failure = TryCreateEngine(preparedModelPath, "GPU");
-                    if (failure != null)
-                    {
-                        string gpuFailure = failure;
-                        Post(() => Debug.LogWarning(
-                            $"The GPU backend could not load the model ({gpuFailure}). " +
-                            "Falling back to the CPU."));
-                    }
+                    failure = gpuFailure = TryCreateEngine(preparedModelPath, "GPU");
                 }
 
                 if (s_engine == IntPtr.Zero)
                 {
                     failure = TryCreateEngine(preparedModelPath, "CPU");
+                }
+
+                // Only worth mentioning once the CPU has actually taken over. When
+                // neither backend starts — most often because the library was
+                // never installed, which is the normal state for someone who only
+                // builds to a device — the error below says all there is to say,
+                // and a warning about the GPU on top of it points at the wrong
+                // thing.
+                if (gpuFailure != null && s_engine != IntPtr.Zero)
+                {
+                    string reported = gpuFailure;
+                    Post(() => Debug.LogWarning(
+                        $"The GPU backend could not load the model ({reported}). " +
+                        "Falling back to the CPU."));
                 }
 
                 if (s_engine == IntPtr.Zero)
@@ -332,6 +343,17 @@ namespace LiteRtLmUnity
         /// </summary>
         private static string TryCreateEngine(string modelPath, string backend)
         {
+#if UNITY_EDITOR_WIN
+            if (backend == "GPU")
+            {
+                string missing = LoadDirectXShaderCompiler();
+                if (missing != null)
+                {
+                    return missing;
+                }
+            }
+#endif
+
             IntPtr settings = IntPtr.Zero;
 
             try
@@ -380,6 +402,67 @@ namespace LiteRtLmUnity
         /// writes the reason to its own log, which Unity captures.
         /// </summary>
         private const string SeeConsole = ". See the Console for the LiteRT-LM message.";
+
+#if UNITY_EDITOR_WIN
+        private static bool s_shaderCompilerLoaded;
+
+        [DllImport("kernel32", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern IntPtr LoadLibraryW(string fileName);
+
+        /// <summary>
+        /// Brings the DirectX Shader Compiler into the process so that the GPU
+        /// backend can start. Returns null once both libraries are loaded, or the
+        /// reason they are not.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The GPU path runs through Dawn, which compiles its shaders at load
+        /// time and reaches for <c>dxcompiler.dll</c> and <c>dxil.dll</c> by bare
+        /// name. Windows resolves a bare name against the directory of the
+        /// running executable, which here is the Unity installation rather than
+        /// this project, so the two are loaded by full path up front instead.
+        /// Once a module is loaded under a name, the later bare-name lookup finds
+        /// it without searching.
+        /// </para>
+        /// <para>
+        /// Unity ships its own copy of both under <c>Data/Tools</c>, but that
+        /// build is older than the shader model Dawn asks for and answers with
+        /// <c>invalid profile cs_6_8</c>, so the installer fetches them from the
+        /// DirectXShaderCompiler releases instead.
+        /// </para>
+        /// </remarks>
+        private static string LoadDirectXShaderCompiler()
+        {
+            if (s_shaderCompilerLoaded)
+            {
+                return null;
+            }
+
+            // Order matters: dxcompiler.dll pulls in dxil.dll to sign what it
+            // compiles, and an unsigned shader is rejected by the driver.
+            foreach (string fileName in new[] { "dxcompiler.dll", "dxil.dll" })
+            {
+                // Kept in step with EditorNativeLibrarySetup, which puts them
+                // here. The two cannot share a constant: that class lives in the
+                // Editor assembly, which this one must not reference.
+                // Resolved against the working directory, which the Editor keeps
+                // at the project root, rather than through Application.dataPath,
+                // because this runs on the thread pool and that is a Unity API.
+                string path = Path.GetFullPath(
+                    Path.Combine("Assets", "Plugins", "x86_64", fileName));
+
+                if (!File.Exists(path) || LoadLibraryW(path) == IntPtr.Zero)
+                {
+                    return
+                        $"the GPU needs {fileName}, which is not installed. Run " +
+                        "Tools > LiteRT-LM > Install Editor Native Library";
+                }
+            }
+
+            s_shaderCompilerLoaded = true;
+            return null;
+        }
+#endif
 
         private void ReportFailure(int requestId, string message)
         {
