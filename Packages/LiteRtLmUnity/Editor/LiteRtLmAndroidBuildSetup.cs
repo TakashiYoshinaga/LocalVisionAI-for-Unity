@@ -18,7 +18,12 @@ namespace LiteRtLmUnity
     /// </summary>
     public sealed class LiteRtLmAndroidBuildSetup : IPostGenerateGradleAndroidProject
     {
-        private const string LiteRtLmVersion = "0.17.0";
+        /// <summary>
+        /// The LiteRT-LM release this package builds against. The Editor
+        /// library is taken from the same release, so that a prompt tried in
+        /// the Editor runs on the runtime version the APK ships.
+        /// </summary>
+        internal const string LiteRtLmVersion = "0.17.0";
         private const string KotlinVersion = "2.4.0";
         private const string LiteRtLmDependency =
             "com.google.ai.edge.litertlm:litertlm-android:" + LiteRtLmVersion;

@@ -125,6 +125,12 @@ InitTestScene*.unity*
 *.partial
 *.partial.meta
 
+# LiteRT-LM Editor library, installed on demand by
+# Tools > LiteRT-LM > Install Editor Native Library. 140 MB, and reproducible
+# from a GitHub release, so it is not tracked here.
+**/[Aa]ssets/Plugins/macOS/
+**/[Aa]ssets/Plugins/macOS.meta
+
 # Local Android signing material
 *.keystore
 *.jks

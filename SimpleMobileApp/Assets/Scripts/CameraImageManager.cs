@@ -34,6 +34,18 @@ public sealed class CameraImageManager : MonoBehaviour
     {
         Screen.orientation = ScreenOrientation.Portrait;
 
+#if UNITY_EDITOR
+        Texture2D editorTestImage = LiteRtLmUnity.EditorLlmSettings.LoadOrCreate().TestImage;
+        if (editorTestImage != null)
+        {
+            // That still image is what gets analyzed in the Editor, so opening a
+            // webcam would only ask for camera permission to show a picture that
+            // is never sent. Preview the image that is actually used instead.
+            ShowStillPreview(editorTestImage);
+            yield break;
+        }
+#endif
+
         yield return RequestCameraPermission();
 
         if (!HasCameraPermission())
@@ -173,6 +185,45 @@ public sealed class CameraImageManager : MonoBehaviour
         frame.Apply(false, false);
         return true;
     }
+
+#if UNITY_EDITOR
+    /// <summary>
+    /// Fills the preview with a fixed texture, cropped to cover the same way the
+    /// camera preview is.
+    /// </summary>
+    private void ShowStillPreview(Texture2D image)
+    {
+        if (_previewImage == null)
+        {
+            return;
+        }
+
+        _previewImage.texture = image;
+        _previewImage.raycastTarget = false;
+        _previewImage.uvRect = new Rect(0f, 0f, 1f, 1f);
+        _previewRect = _previewImage.rectTransform;
+        _previewParentRect = _previewRect.parent as RectTransform;
+
+        if (_previewParentRect == null)
+        {
+            return;
+        }
+
+        Rect parentRect = _previewParentRect.rect;
+        float coverScale = Mathf.Max(
+            parentRect.width / image.width,
+            parentRect.height / image.height);
+
+        _previewRect.anchorMin = new Vector2(0.5f, 0.5f);
+        _previewRect.anchorMax = new Vector2(0.5f, 0.5f);
+        _previewRect.pivot = new Vector2(0.5f, 0.5f);
+        _previewRect.anchoredPosition = Vector2.zero;
+        _previewRect.localEulerAngles = Vector3.zero;
+        _previewRect.sizeDelta = new Vector2(
+            image.width * coverScale,
+            image.height * coverScale);
+    }
+#endif
 
     private void UpdatePreviewLayout()
     {

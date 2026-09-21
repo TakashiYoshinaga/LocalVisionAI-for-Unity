@@ -9,10 +9,6 @@ namespace LiteRtLmUnity
 {
     public class LlmManager : MonoBehaviour
     {
-        private const string AndroidBridgeClass =
-            "com.takashiyoshinaga.localvisionai.BundledModelBridge";
-        private const string ModelAssetPath = BundledModelPaths.AndroidAssetPath;
-        private const string ModelFileName = BundledModelPaths.FileName;
         private const int DefaultAnswerTokenBudget = 512;
         private const int DefaultTopK = 1;
         private const float DefaultTopP = 0.95f;
@@ -59,6 +55,7 @@ namespace LiteRtLmUnity
             "Describe what is visible in this image clearly and concisely.";
 
         private LlmDataSource _dataSource;
+        private ILlmBackend _backend;
         private Action<bool> _onRetryAvailabilityChanged;
         private IDisposable _imageRequestSubscription;
         private bool _modelSetupInProgress;
@@ -91,6 +88,7 @@ namespace LiteRtLmUnity
             _dataSource = llmDataSource;
             _onRetryAvailabilityChanged = onRetryAvailabilityChanged;
             _onRetryAvailabilityChanged?.Invoke(false);
+            _backend = CreateBackend();
             _imageRequestSubscription?.Dispose();
             _imageRequestSubscription = _dataSource.ImageRequests
                 .ObserveOnMainThread()
@@ -98,8 +96,32 @@ namespace LiteRtLmUnity
             RetryModelSetup();
         }
 
+        /// <summary>
+        /// Picks how inference runs. The device uses the Kotlin bridge this
+        /// package ships; the Editor talks to the LiteRT-LM C API directly so that
+        /// prompts can be tried without a Build and Run each time.
+        /// </summary>
+        private ILlmBackend CreateBackend()
+        {
+#if UNITY_EDITOR_OSX
+            return new EditorLlmBackend(this);
+#elif UNITY_EDITOR
+            return new UnsupportedLlmBackend(
+                this,
+                "Running the model in the Editor currently needs the macOS LiteRT-LM " +
+                "library. Build and run on an Android device instead.");
+#elif UNITY_ANDROID
+            return new AndroidLlmBackend(this);
+#else
+            return new UnsupportedLlmBackend(this, "This sample requires an Android device.");
+#endif
+        }
+
         private void Update()
         {
+            // Backends that work on another thread deliver their results here.
+            _backend?.Pump();
+
             if (!_inferenceInProgress || _dataSource == null)
             {
                 return;
@@ -166,38 +188,21 @@ namespace LiteRtLmUnity
         {
             if (_modelSetupInProgress ||
                 _engineInitializationInProgress ||
-                _dataSource == null)
+                _dataSource == null ||
+                _backend == null)
             {
                 return;
             }
 
-    #if UNITY_ANDROID && !UNITY_EDITOR
             _modelSetupInProgress = true;
             _onRetryAvailabilityChanged?.Invoke(false);
-            _dataSource.PublishProgress(new LlmProgressReport(
-                LlmPhase.ExtractingModel,
-                "Preparing bundled AI model...",
-                0f));
-
-            try
-            {
-                using AndroidJavaClass bridge = new(AndroidBridgeClass);
-                bridge.CallStatic(
-                    "prepareBundledModel",
-                    gameObject.name,
-                    ModelAssetPath,
-                    ModelFileName);
-            }
-            catch (Exception exception)
-            {
-                _modelSetupInProgress = false;
-                PublishError($"Could not start model setup: {exception.Message}");
-            }
-    #else
-            PublishError("Bundled model setup requires an Android device.");
-    #endif
+            _backend.PrepareModel();
         }
 
+        /// <summary>
+        /// Entry point for the Android bridge, which answers through
+        /// UnitySendMessage and therefore can only pass a string.
+        /// </summary>
         public void OnBundledModelProgress(string json)
         {
             BundledModelCallback callback;
@@ -221,33 +226,16 @@ namespace LiteRtLmUnity
                 return;
             }
 
-            float? progress = callback.hasProgress
-                ? callback.progress01
-                : null;
-
-            _dataSource?.PublishProgress(new LlmProgressReport(
+            ReportModelProgress(
                 phase,
                 callback.message,
-                progress));
-
-            if (callback.ready)
-            {
-                PreparedModelPath = callback.modelPath;
-                _modelSetupInProgress = false;
-                _onRetryAvailabilityChanged?.Invoke(false);
-                StartEngineInitialization();
-            }
-            else if (phase == LlmPhase.Error)
-            {
-                _modelSetupInProgress = false;
-                _onRetryAvailabilityChanged?.Invoke(callback.retryable);
-            }
-            else
-            {
-                _onRetryAvailabilityChanged?.Invoke(false);
-            }
+                callback.hasProgress ? callback.progress01 : null,
+                callback.ready,
+                callback.retryable,
+                callback.modelPath);
         }
 
+        /// <summary>Entry point for the Android bridge. See <see cref="OnBundledModelProgress"/>.</summary>
         public void OnEngineProgress(string json)
         {
             BundledModelCallback callback;
@@ -271,11 +259,80 @@ namespace LiteRtLmUnity
                 return;
             }
 
-            _dataSource?.PublishProgress(new LlmProgressReport(
-                phase,
-                callback.message));
+            ReportEngineProgress(phase, callback.message, callback.ready, callback.retryable);
+        }
 
-            if (phase == LlmPhase.Ready && callback.ready)
+        /// <summary>Entry point for the Android bridge. See <see cref="OnBundledModelProgress"/>.</summary>
+        public void OnAnalysisProgress(string json)
+        {
+            AnalysisCallback callback;
+
+            try
+            {
+                callback = JsonUtility.FromJson<AnalysisCallback>(json);
+            }
+            catch (Exception exception)
+            {
+                _inferenceInProgress = false;
+                EndAnalysisTracking();
+                PublishError($"Invalid analysis response: {exception.Message}");
+                return;
+            }
+
+            if (callback == null ||
+                !Enum.TryParse(callback.phase, out LlmPhase phase))
+            {
+                _inferenceInProgress = false;
+                EndAnalysisTracking();
+                PublishError("Invalid analysis response.");
+                return;
+            }
+
+            ReportAnalysis(callback.requestId, phase, callback.message, callback.resultText);
+        }
+
+        /// <summary>
+        /// How a backend reports on making the model file available. Both the
+        /// device's extraction step and the Editor's file lookup end here.
+        /// </summary>
+        internal void ReportModelProgress(
+            LlmPhase phase,
+            string message,
+            float? progress,
+            bool ready,
+            bool retryable,
+            string modelPath)
+        {
+            _dataSource?.PublishProgress(new LlmProgressReport(phase, message, progress));
+
+            if (ready)
+            {
+                PreparedModelPath = modelPath;
+                _modelSetupInProgress = false;
+                _onRetryAvailabilityChanged?.Invoke(false);
+                StartEngineInitialization();
+            }
+            else if (phase == LlmPhase.Error)
+            {
+                _modelSetupInProgress = false;
+                _onRetryAvailabilityChanged?.Invoke(retryable);
+            }
+            else
+            {
+                _onRetryAvailabilityChanged?.Invoke(false);
+            }
+        }
+
+        /// <summary>How a backend reports on loading the model into an engine.</summary>
+        internal void ReportEngineProgress(
+            LlmPhase phase,
+            string message,
+            bool ready,
+            bool retryable)
+        {
+            _dataSource?.PublishProgress(new LlmProgressReport(phase, message));
+
+            if (phase == LlmPhase.Ready && ready)
             {
                 IsReady = true;
                 _engineInitializationInProgress = false;
@@ -285,8 +342,59 @@ namespace LiteRtLmUnity
             {
                 IsReady = false;
                 _engineInitializationInProgress = false;
-                _onRetryAvailabilityChanged?.Invoke(callback.retryable);
+                _onRetryAvailabilityChanged?.Invoke(retryable);
             }
+        }
+
+        /// <summary>How a backend reports the outcome of one inference request.</summary>
+        internal void ReportAnalysis(
+            int requestId,
+            LlmPhase phase,
+            string message,
+            string resultText)
+        {
+            if (requestId != _activeRequestId)
+            {
+                return;
+            }
+
+            if (phase == LlmPhase.Inferencing)
+            {
+                _dataSource?.PublishProgress(new LlmProgressReport(phase, message));
+                return;
+            }
+
+            _inferenceInProgress = false;
+            EndAnalysisTracking();
+
+            if (phase == LlmPhase.Error)
+            {
+                PublishError(message);
+                return;
+            }
+
+            // Report Ready before the answer so the UI re-enables its capture
+            // button first and the answer stays as the last text on screen.
+            _dataSource?.PublishProgress(new LlmProgressReport(LlmPhase.Ready, message));
+            _dataSource?.PublishResultText(resultText);
+        }
+
+        /// <summary>
+        /// How a backend reports that a call could not even be started. Whatever
+        /// was in progress is cancelled, because nothing will report on it.
+        /// </summary>
+        internal void ReportError(string message)
+        {
+            _modelSetupInProgress = false;
+            _engineInitializationInProgress = false;
+
+            if (_inferenceInProgress)
+            {
+                _inferenceInProgress = false;
+                EndAnalysisTracking();
+            }
+
+            PublishError(message);
         }
 
         private void AnalyzeImage(ImageRequest request)
@@ -315,7 +423,11 @@ namespace LiteRtLmUnity
                 return;
             }
 
-    #if UNITY_ANDROID && !UNITY_EDITOR
+            string effectiveUserPrompt = string.IsNullOrWhiteSpace(_userPrompt) &&
+                                         string.IsNullOrWhiteSpace(_systemPrompt)
+                ? _fallbackImagePrompt
+                : _userPrompt;
+
             _inferenceInProgress = true;
             _activeInferenceKind = InferenceKind.Image;
             _activeRequestId = ++_lastRequestId;
@@ -324,57 +436,10 @@ namespace LiteRtLmUnity
                 LlmPhase.Inferencing,
                 "Analyzing image... 0s"));
 
-            try
-            {
-                string effectiveUserPrompt = string.IsNullOrWhiteSpace(_userPrompt) &&
-                                             string.IsNullOrWhiteSpace(_systemPrompt)
-                    ? _fallbackImagePrompt
-                    : _userPrompt;
-
-                using AndroidJavaClass bridge = new(AndroidBridgeClass);
-
-                // AndroidJavaClass.CallStatic cannot express named arguments, so
-                // these values must stay in the same order as
-                // BundledModelBridge.analyze in BundledModelBridge.kt.
-                bridge.CallStatic(
-                    // Static Kotlin method to invoke.
-                    "analyze",
-                    // Name of the GameObject that hosts this LlmManager.
-                    // Kotlin uses UnitySendMessage to invoke its callback methods.
-                    gameObject.name,
-                    // Identifies this request so stale callbacks can be ignored.
-                    _activeRequestId,
-                    // Captured camera image encoded as JPEG bytes.
-                    request.JpegData,
-                    // Conversation-level instruction that controls model behavior.
-                    _systemPrompt,
-                    // Per-request question or instruction entered by the user.
-                    effectiveUserPrompt,
-                    // Whether the model may generate an internal thinking channel.
-                    _enableThinking,
-                    // Maximum tokens allocated to the internal thinking channel.
-                    _thinkingTokenBudget,
-                    // Maximum answer tokens; 0 or less uses the model default.
-                    _answerTokenBudget,
-                    // Candidate token count; 1 is greedy, 0 or less uses the
-                    // LiteRT-LM default.
-                    _topK,
-                    // Cumulative probability cutoff.
-                    _topP,
-                    // Logit scaling; higher values vary the answer more.
-                    _temperature,
-                    // Random seed for sampling.
-                    ResolveSeed());
-            }
-            catch (Exception exception)
-            {
-                _inferenceInProgress = false;
-                EndAnalysisTracking();
-                PublishError($"Could not start image analysis: {exception.Message}");
-            }
-    #else
-            PublishError("Image analysis requires an Android device.");
-    #endif
+            _backend.Analyze(
+                _activeRequestId,
+                request.JpegData,
+                BuildRequestOptions(effectiveUserPrompt));
         }
 
         /// <summary>
@@ -411,7 +476,6 @@ namespace LiteRtLmUnity
                 return;
             }
 
-    #if UNITY_ANDROID && !UNITY_EDITOR
             _inferenceInProgress = true;
             _activeInferenceKind = InferenceKind.Text;
             _activeRequestId = ++_lastRequestId;
@@ -420,90 +484,7 @@ namespace LiteRtLmUnity
                 LlmPhase.Inferencing,
                 "Generating response... 0s"));
 
-            try
-            {
-                using AndroidJavaClass bridge = new(AndroidBridgeClass);
-
-                // Keep these values in the same order as
-                // BundledModelBridge.analyzeText in BundledModelBridge.kt.
-                bridge.CallStatic(
-                    "analyzeText",
-                    gameObject.name,
-                    _activeRequestId,
-                    _systemPrompt,
-                    userPrompt,
-                    _enableThinking,
-                    _thinkingTokenBudget,
-                    _answerTokenBudget,
-                    _topK,
-                    _topP,
-                    _temperature,
-                    ResolveSeed());
-            }
-            catch (Exception exception)
-            {
-                _inferenceInProgress = false;
-                EndAnalysisTracking();
-                PublishError($"Could not start text generation: {exception.Message}");
-            }
-    #else
-            PublishError("Text generation requires an Android device.");
-    #endif
-        }
-
-        public void OnAnalysisProgress(string json)
-        {
-            AnalysisCallback callback;
-
-            try
-            {
-                callback = JsonUtility.FromJson<AnalysisCallback>(json);
-            }
-            catch (Exception exception)
-            {
-                _inferenceInProgress = false;
-                EndAnalysisTracking();
-                PublishError($"Invalid analysis response: {exception.Message}");
-                return;
-            }
-
-            if (callback == null ||
-                !Enum.TryParse(callback.phase, out LlmPhase phase))
-            {
-                _inferenceInProgress = false;
-                EndAnalysisTracking();
-                PublishError("Invalid analysis response.");
-                return;
-            }
-
-            if (callback.requestId != _activeRequestId)
-            {
-                return;
-            }
-
-            if (phase == LlmPhase.Inferencing)
-            {
-                _dataSource?.PublishProgress(new LlmProgressReport(
-                    phase,
-                    callback.message));
-                return;
-            }
-
-            _inferenceInProgress = false;
-            EndAnalysisTracking();
-
-            if (phase == LlmPhase.Error)
-            {
-                PublishError(callback.message);
-                return;
-            }
-
-            // Report Ready before the answer so the UI re-enables its capture
-            // button first and the answer stays as the last text on screen.
-            _dataSource?.PublishProgress(new LlmProgressReport(
-                LlmPhase.Ready,
-                callback.message));
-            _dataSource?.PublishResultText(callback.resultText);
+            _backend.AnalyzeText(_activeRequestId, BuildRequestOptions(userPrompt));
         }
 
         public void Shutdown()
@@ -515,50 +496,33 @@ namespace LiteRtLmUnity
             _inferenceInProgress = false;
             EndAnalysisTracking();
             IsReady = false;
-
-    #if UNITY_ANDROID && !UNITY_EDITOR
-            try
-            {
-                using AndroidJavaClass bridge = new(AndroidBridgeClass);
-                bridge.CallStatic("shutdown");
-            }
-            catch (Exception exception)
-            {
-                Debug.LogWarning(
-                    $"Could not shut down the AI engine cleanly: {exception.Message}");
-            }
-    #endif
+            _backend?.Shutdown();
         }
 
         private void StartEngineInitialization()
         {
-    #if UNITY_ANDROID && !UNITY_EDITOR
-            if (string.IsNullOrEmpty(PreparedModelPath))
+            if (_backend == null)
             {
-                PublishError("Prepared AI model path is missing.");
                 return;
             }
 
             _engineInitializationInProgress = true;
             IsReady = false;
-            _dataSource?.PublishProgress(new LlmProgressReport(
-                LlmPhase.Initializing,
-                "Initializing AI engine..."));
+            _backend.InitializeEngine(PreparedModelPath);
+        }
 
-            try
-            {
-                using AndroidJavaClass bridge = new(AndroidBridgeClass);
-                bridge.CallStatic(
-                    "initialize",
-                    gameObject.name,
-                    PreparedModelPath);
-            }
-            catch (Exception exception)
-            {
-                _engineInitializationInProgress = false;
-                PublishError($"Could not start AI initialization: {exception.Message}");
-            }
-    #endif
+        private LlmRequestOptions BuildRequestOptions(string userPrompt)
+        {
+            return new LlmRequestOptions(
+                _systemPrompt,
+                userPrompt,
+                _enableThinking,
+                _thinkingTokenBudget,
+                _answerTokenBudget,
+                _topK,
+                _topP,
+                _temperature,
+                ResolveSeed());
         }
 
         /// <summary>
