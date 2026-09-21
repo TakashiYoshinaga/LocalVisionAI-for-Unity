@@ -30,15 +30,15 @@ namespace LiteRtLmUnity
         [Header("Sampling")]
         // These mirror the LiteRT-LM defaults for this model, so the shipped
         // values reproduce the behavior this sample had before they existed.
-        [Tooltip("Number of candidate tokens. 1 is greedy decoding and ignores Top P and Temperature. 0 or less leaves the sampler to LiteRT-LM.")]
+        [Tooltip("How many candidates the next word is picked from. 1 always takes the most likely one, so the same input tends to give the same answer and Top P, Temperature and Seed stop mattering. 0 or less leaves this to LiteRT-LM.")]
         [SerializeField] private int _topK = DefaultTopK;
-        [Tooltip("Cumulative probability cutoff. Used only when Top K is 2 or more.")]
+        [Tooltip("Discards unlikely candidates, keeping only the top ones that together account for this share of the probability. Used only when Top K is 2 or more.")]
         [SerializeField, Range(0f, 1f)] private float _topP = DefaultTopP;
-        [Tooltip("Higher values make the answer more varied, lower values more repeatable. Used only when Top K is 2 or more.")]
+        [Tooltip("Higher values make the wording more varied, lower values more predictable. Used only when Top K is 2 or more.")]
         [SerializeField, Min(0f)] private float _temperature = DefaultTemperature;
-        [Tooltip("Draws a new seed for every request, so the same question can produce a different answer. Used only when Top K is 2 or more.")]
+        [Tooltip("Starts each request from a new random draw, so asking the same question again can give a different answer. Used only when Top K is 2 or more.")]
         [SerializeField] private bool _randomizeSeed = true;
-        [Tooltip("Fixed seed that makes sampling reproducible. Used only when Randomize Seed is off and Top K is 2 or more.")]
+        [Tooltip("A fixed starting point for those random draws, so the same question comes back with the same answer. Used only when Randomize Seed is off and Top K is 2 or more.")]
         [SerializeField] private int _seed;
 
         [Header("Analysis Monitoring")]
